@@ -27,8 +27,16 @@ function getFileLabel(filename) {
 
 const TYPING_TIMEOUT = 2500; // ms of inactivity before stop event fires
 
+const MSG_KEY = (roomId) => `wl_messages_${roomId}`;
+
 const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
-    const [messages, setMessages] = useState([]);
+    // Load saved messages from sessionStorage so they survive back-button navigation
+    const [messages, setMessages] = useState(() => {
+        try {
+            const saved = sessionStorage.getItem(MSG_KEY(roomId));
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
     const [input, setInput] = useState('');
     const [isUploading, setIsUploading] = useState(false);
     const [uploadFileName, setUploadFileName] = useState('');
@@ -38,12 +46,19 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
     const [showMembers, setShowMembers] = useState(false);
     const [timeLeft, setTimeLeft] = useState('');
     const [isShredded, setIsShredded] = useState(false);
-    const [typingUsers, setTypingUsers] = useState([]); // who is currently typing
+    const [typingUsers, setTypingUsers] = useState([]);
     const scrollRef = useRef();
     const socketRef = useRef();
     const fileInputRef = useRef();
     const typingTimerRef = useRef(null);
     const isTypingRef = useRef(false);
+
+    // Persist messages to sessionStorage on every update
+    useEffect(() => {
+        try {
+            sessionStorage.setItem(MSG_KEY(roomId), JSON.stringify(messages));
+        } catch { /* quota exceeded / private mode — silently ignore */ }
+    }, [messages, roomId]);
 
     // Timer Logic
     useEffect(() => {
@@ -57,6 +72,7 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
             if (difference <= 0) {
                 setTimeLeft('00:00');
                 setIsShredded(true);
+                sessionStorage.removeItem(MSG_KEY(roomId)); // clear on shred
                 clearInterval(timerInterval);
                 return;
             }
@@ -68,7 +84,7 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
         updateTimer();
         const timerInterval = setInterval(updateTimer, 1000);
         return () => clearInterval(timerInterval);
-    }, [createdAt]);
+    }, [createdAt, roomId]);
 
     useEffect(() => {
         const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';

@@ -8,39 +8,47 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
-  // Bug fix: intercept browser back button so it leaves the room instead of
-  // navigating away (then coming back with stale session on refresh)
+  // Controls whether we show the chat room or the join screen.
+  // We keep roomData in localStorage so messages in sessionStorage can be
+  // restored when the user rejoins. Only a true "leave" clears everything.
+  const [viewChat, setViewChat] = useState(!!localStorage.getItem('whisperlink_session'));
+
+  // Intercept browser back button: show join screen but keep session saved
+  // so messages survive when the user goes back and then rejoins the same room.
   useEffect(() => {
-    if (roomData) {
-      // Push a new history entry so the back button has something to pop
+    if (viewChat && roomData) {
       window.history.pushState({ inRoom: true }, '');
 
-      const handlePopState = (e) => {
-        // Back button was pressed while in a room → leave the room
-        handleLeave();
+      const handlePopState = () => {
+        // Just hide the chat view — don't clear localStorage or messages
+        setViewChat(false);
       };
 
       window.addEventListener('popstate', handlePopState);
       return () => window.removeEventListener('popstate', handlePopState);
     }
-  }, [roomData]);
+  }, [viewChat, roomData]);
 
   const handleJoin = (roomId, secretPhrase, username, createdAt) => {
     const session = { roomId, secretPhrase, username, createdAt };
     setRoomData(session);
     localStorage.setItem('whisperlink_session', JSON.stringify(session));
+    setViewChat(true);
   };
 
+  // Full leave: clears session AND messages
   const handleLeave = () => {
+    if (roomData) {
+      sessionStorage.removeItem(`wl_messages_${roomData.roomId}`);
+    }
     localStorage.removeItem('whisperlink_session');
     setRoomData(null);
+    setViewChat(false);
   };
 
   return (
     <div className="App">
-      {!roomData ? (
-        <JoinRoom onJoin={handleJoin} />
-      ) : (
+      {viewChat && roomData ? (
         <ChatRoom
           roomId={roomData.roomId}
           secretPhrase={roomData.secretPhrase}
@@ -48,6 +56,8 @@ function App() {
           createdAt={roomData.createdAt}
           onLeave={handleLeave}
         />
+      ) : (
+        <JoinRoom onJoin={handleJoin} />
       )}
     </div>
   );
