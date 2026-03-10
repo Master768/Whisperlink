@@ -177,12 +177,12 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
         }
     };
 
-    // Typing label builder
+    // Typing label builder — handles 1, 2, or many users
     const typingLabel = (() => {
         if (typingUsers.length === 0) return null;
         if (typingUsers.length === 1) return `${typingUsers[0]} is typing`;
         if (typingUsers.length === 2) return `${typingUsers[0]} and ${typingUsers[1]} are typing`;
-        return `${typingUsers.length} people are typing`;
+        return `${typingUsers[0]} and ${typingUsers.length - 1} others are typing`;
     })();
 
     // Shredded screen
@@ -370,27 +370,24 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                         );
                     })}
 
-                    {/* Typing indicator */}
-                    {typingLabel && (
-                        <div className="flex justify-start animate-fade-in">
-                            <div className="flex items-center gap-2 px-3 py-2 rounded-2xl rounded-tl-none bg-[#141414] border border-white/5">
-                                <div className="flex items-end gap-0.5 h-3">
-                                    <span className="w-1 h-1 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                                    <span className="w-1 h-1.5 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                                    <span className="w-1 h-1 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-                                </div>
-                                <span className="text-[9px] text-white/40 font-black italic uppercase tracking-wide">{typingLabel}...</span>
-                            </div>
-                        </div>
-                    )}
-
                     <div ref={scrollRef} />
                 </div>
 
-                {/* Status bar above input (upload progress / disconnected) */}
-                <div className="px-3 sm:px-5 shrink-0">
+                {/* Status bar: typing / uploading / disconnected */}
+                <div className="px-3 sm:px-5 shrink-0 space-y-1 mb-1">
+                    {/* Typing indicator — always above input, never inside the scroll */}
+                    {typingLabel && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/[0.03] border border-white/[0.06] animate-fade-in">
+                            <div className="flex items-end gap-0.5 h-3 shrink-0">
+                                <span className="w-1 h-1 rounded-full animate-bounce" style={{ background: 'rgba(255,255,255,0.4)', animationDelay: '0ms' }}></span>
+                                <span className="w-1 h-1.5 rounded-full animate-bounce" style={{ background: 'rgba(255,255,255,0.4)', animationDelay: '150ms' }}></span>
+                                <span className="w-1 h-1 rounded-full animate-bounce" style={{ background: 'rgba(255,255,255,0.4)', animationDelay: '300ms' }}></span>
+                            </div>
+                            <span className="text-[10px] font-black text-white/45 italic tracking-wide truncate">{typingLabel}...</span>
+                        </div>
+                    )}
                     {isUploading && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 mb-1.5 rounded-xl bg-primary/5 border border-primary/15">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-primary/5 border border-primary/15">
                             <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0"></div>
                             <span className="text-[10px] font-black text-primary italic uppercase tracking-wider truncate">
                                 Uploading {uploadFileName}...
@@ -398,7 +395,7 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                         </div>
                     )}
                     {!isConnected && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 mb-1.5 rounded-xl bg-red-500/10 border border-red-500/20">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20">
                             <WifiOff className="w-3 h-3 text-red-400 animate-pulse shrink-0" />
                             <span className="text-[10px] font-black text-red-400 italic uppercase tracking-wider">Re-establishing connection...</span>
                         </div>

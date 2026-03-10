@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, ArrowRight, Zap, Hash, User, Eye, EyeOff } from 'lucide-react';
+import { Shield, ArrowRight, Zap, Hash, User, Eye, EyeOff, RefreshCw } from 'lucide-react';
 
 const JoinRoom = ({ onJoin }) => {
     const [roomId, setRoomId] = useState('');
@@ -9,25 +9,45 @@ const JoinRoom = ({ onJoin }) => {
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
+    // Generate a random 5-digit numeric room code
+    const generateRoomCode = () => {
+        const code = Math.floor(10000 + Math.random() * 90000).toString();
+        setRoomId(code);
+        setError('');
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!secretPhrase || !username) return;
+        setError('');
+
+        // Validation
+        if (!username || username.trim().length < 2) {
+            setError('Alias must be at least 2 characters');
+            return;
+        }
+        if (roomId && roomId.trim().length < 4) {
+            setError('Room coordinate must be at least 4 characters');
+            return;
+        }
+        if (!secretPhrase || secretPhrase.length < 4) {
+            setError('Cipher key must be at least 4 characters');
+            return;
+        }
 
         setIsLoading(true);
-        setError('');
 
         try {
             const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
             const response = await fetch(`${backendUrl}/api/rooms`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ roomId, secretPhrase })
+                body: JSON.stringify({ roomId: roomId.trim() || undefined, secretPhrase })
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                onJoin(data.roomId, secretPhrase, username, data.createdAt);
+                onJoin(data.roomId, secretPhrase, username.trim(), data.createdAt);
             } else {
                 setError(data.error || 'Access Denied');
             }
@@ -66,7 +86,9 @@ const JoinRoom = ({ onJoin }) => {
                 <form onSubmit={handleSubmit} className="space-y-4 glass-dark p-6 sm:p-8 rounded-[2rem] border border-white/[0.05] shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
                     {/* Username */}
                     <div className="space-y-1.5">
-                        <label className="block text-[9px] font-black text-white/50 uppercase tracking-[0.3em] ml-1">Identify As</label>
+                        <label className="block text-[9px] font-black text-white/50 uppercase tracking-[0.3em] ml-1">
+                            Identify As <span className="text-white/30">(min 2)</span>
+                        </label>
                         <div className="relative group">
                             <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-primary transition-colors" />
                             <input
@@ -81,30 +103,53 @@ const JoinRoom = ({ onJoin }) => {
                         </div>
                     </div>
 
-                    {/* Room ID */}
+                    {/* Room ID + Generator */}
                     <div className="space-y-1.5">
-                        <label className="block text-[9px] font-black text-white/50 uppercase tracking-[0.3em] ml-1">Room Coordinate (Optional)</label>
-                        <div className="relative group">
-                            <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-primary transition-colors" />
-                            <input
-                                type="text"
-                                placeholder="Auto-generate if empty"
-                                className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl pl-11 pr-4 py-3.5 focus:outline-none focus:border-primary/40 focus:bg-white/[0.04] transition-all text-sm font-medium text-white placeholder:text-white/30 italic"
-                                value={roomId}
-                                onChange={(e) => setRoomId(e.target.value)}
-                                maxLength={12}
-                            />
+                        <label className="block text-[9px] font-black text-white/50 uppercase tracking-[0.3em] ml-1">
+                            Room Coordinate <span className="text-white/30">(optional, min 4)</span>
+                        </label>
+                        <div className="flex gap-2">
+                            <div className="relative group flex-1">
+                                <Hash className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-primary transition-colors" />
+                                <input
+                                    type="text"
+                                    placeholder="Enter or generate..."
+                                    className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl pl-11 pr-4 py-3.5 focus:outline-none focus:border-primary/40 focus:bg-white/[0.04] transition-all text-sm font-medium text-white placeholder:text-white/30 italic"
+                                    value={roomId}
+                                    onChange={(e) => setRoomId(e.target.value)}
+                                    maxLength={12}
+                                    minLength={roomId ? 4 : 0}
+                                    pattern={roomId ? '.{4,}' : undefined}
+                                />
+                            </div>
+                            {/* 5-digit code generator button */}
+                            <button
+                                type="button"
+                                onClick={generateRoomCode}
+                                title="Generate 5-digit room code"
+                                className="shrink-0 px-3 py-3 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 hover:border-primary/40 transition-all active:scale-95 group"
+                            >
+                                <RefreshCw className="w-4 h-4 text-primary group-hover:rotate-180 transition-transform duration-500" />
+                            </button>
                         </div>
+                        {roomId && (
+                            <p className="text-[9px] text-white/30 ml-1 italic">
+                                Code: <span className="text-primary font-black tracking-widest">{roomId}</span>
+                                {roomId.length < 4 && <span className="text-red-400 ml-2">— need {4 - roomId.length} more</span>}
+                            </p>
+                        )}
                     </div>
 
                     {/* Cipher Key */}
                     <div className="space-y-1.5">
-                        <label className="block text-[9px] font-black text-white/50 uppercase tracking-[0.3em] ml-1">Cipher Key</label>
+                        <label className="block text-[9px] font-black text-white/50 uppercase tracking-[0.3em] ml-1">
+                            Cipher Key <span className="text-white/30">(min 4)</span>
+                        </label>
                         <div className="relative group">
                             <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-primary transition-colors" />
                             <input
                                 type={showPassword ? 'text' : 'password'}
-                                placeholder="Entry phrase..."
+                                placeholder="Entry phrase... (min 4 chars)"
                                 className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl pl-11 pr-12 py-3.5 focus:outline-none focus:border-primary/40 focus:bg-white/[0.04] transition-all text-sm font-medium text-white placeholder:text-white/30 italic"
                                 value={secretPhrase}
                                 onChange={(e) => setSecretPhrase(e.target.value)}
@@ -118,11 +163,14 @@ const JoinRoom = ({ onJoin }) => {
                                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                         </div>
+                        {secretPhrase.length > 0 && secretPhrase.length < 4 && (
+                            <p className="text-[9px] text-red-400 ml-1 italic">{4 - secretPhrase.length} more character{4 - secretPhrase.length > 1 ? 's' : ''} needed</p>
+                        )}
                     </div>
 
                     {/* Error */}
                     {error && (
-                        <div className="flex items-center justify-center space-x-2 text-red-400 bg-red-500/5 py-2.5 rounded-xl border border-red-500/10">
+                        <div className="flex items-center justify-center text-red-400 bg-red-500/5 py-2.5 rounded-xl border border-red-500/10">
                             <span className="text-[10px] font-black uppercase tracking-widest text-center px-2">{error}</span>
                         </div>
                     )}
@@ -131,9 +179,9 @@ const JoinRoom = ({ onJoin }) => {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className={`w-full group/btn relative flex items-center justify-center gap-3 py-4 rounded-xl font-black text-black transition-all transform active:scale-[0.98] ${isLoading
+                        className={`w-full group/btn relative flex items-center justify-center gap-3 py-4 rounded-xl font-black transition-all transform active:scale-[0.98] ${isLoading
                             ? 'bg-white/10 cursor-not-allowed text-white/40'
-                            : 'bg-gradient-to-br from-primary to-secondary shadow-[0_8px_25px_rgba(0,242,254,0.2)] hover:shadow-[0_12px_35px_rgba(0,242,254,0.3)] hover:-translate-y-0.5'
+                            : 'bg-gradient-to-br from-primary to-secondary text-black shadow-[0_8px_25px_rgba(0,242,254,0.2)] hover:shadow-[0_12px_35px_rgba(0,242,254,0.3)] hover:-translate-y-0.5'
                             }`}
                     >
                         <span className="uppercase tracking-[0.15em] italic text-sm">{isLoading ? 'Breaching...' : 'Establish Connection'}</span>
