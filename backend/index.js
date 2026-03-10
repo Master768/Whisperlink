@@ -56,7 +56,26 @@ const storage = multer.diskStorage({
 
 const upload = multer({
     storage: storage,
-    limits: { fileSize: 25 * 1024 * 1024 } // 25MB limit
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25MB limit
+    fileFilter: (req, file, cb) => {
+        const allowed = [
+            'image/', 'video/', 'audio/',
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'text/plain',
+            'text/x-python', 'application/x-python-code',
+            'application/octet-stream', // covers .ipynb and unknown types
+        ];
+        const isAllowed = allowed.some(type => file.mimetype.startsWith(type) || file.mimetype === type);
+        const allowedExtensions = /\.(jpg|jpeg|png|gif|webp|mp4|mov|mp3|wav|pdf|docx|doc|txt|py|ipynb|zip|csv)$/i;
+        const extOk = allowedExtensions.test(file.originalname);
+        if (isAllowed || extOk) {
+            cb(null, true);
+        } else {
+            cb(new Error('File type not supported'), false);
+        }
+    }
 });
 
 // Routes
@@ -194,6 +213,15 @@ io.on('connection', (socket) => {
         } catch (err) {
             console.error('Error updating room activity:', err);
         }
+    });
+
+    // Typing indicators
+    socket.on('typing_start', ({ roomId }) => {
+        socket.to(roomId).emit('user_typing', { username: socket.username });
+    });
+
+    socket.on('typing_stop', ({ roomId }) => {
+        socket.to(roomId).emit('user_stop_typing', { username: socket.username });
     });
 
     socket.on('disconnect', () => {

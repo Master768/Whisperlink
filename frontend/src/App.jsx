@@ -8,6 +8,23 @@ function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
+  // Bug fix: intercept browser back button so it leaves the room instead of
+  // navigating away (then coming back with stale session on refresh)
+  useEffect(() => {
+    if (roomData) {
+      // Push a new history entry so the back button has something to pop
+      window.history.pushState({ inRoom: true }, '');
+
+      const handlePopState = (e) => {
+        // Back button was pressed while in a room → leave the room
+        handleLeave();
+      };
+
+      window.addEventListener('popstate', handlePopState);
+      return () => window.removeEventListener('popstate', handlePopState);
+    }
+  }, [roomData]);
+
   const handleJoin = (roomId, secretPhrase, username, createdAt) => {
     const session = { roomId, secretPhrase, username, createdAt };
     setRoomData(session);
