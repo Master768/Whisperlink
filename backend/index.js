@@ -241,7 +241,7 @@ io.on('connection', (socket) => {
                     });
                 }
             }
-        }, 10000); // 10-second grace period
+        }, 40000); // 40-second grace period
     });
 });
 
