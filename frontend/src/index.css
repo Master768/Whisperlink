@@ -1,20 +1,17 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --page-bg: #08040f;
-  --surface-1: #0f0820;
-  --surface-2: #170d30;
-  --surface-3: #1f1240;
-  --primary: #e879f9;
-  --secondary: #a78bfa;
-  --gold: #fbbf24;
-  --error: #f43f5e;
-  --text-1: #fdf4ff;
-  --text-2: #c4b5fd;
-  --text-3: #7c5fa0;
-  --border: rgba(232, 121, 249, 0.08);
-  --border-strong: rgba(232, 121, 249, 0.2);
+  --bg-main: #0e1116;
+  --bg-surface: #161a22;
+  --bg-surface-hover: #1e2430;
+  --border-color: #2b303b;
+  --text-primary: #e6edf3;
+  --text-secondary: #848d97;
+  --primary-accent: #2f81f7;
+  --primary-hover: #1a6ff0;
+  --danger: #f85149;
+  --success: #3fb950;
 }
 
 * {
@@ -23,71 +20,59 @@
 
 body {
   margin: 0;
-  background-color: var(--page-bg);
-  color: var(--text-1);
-  font-family: 'Space Grotesk', system-ui, sans-serif;
+  background-color: var(--bg-main);
+  color: var(--text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ── Diamond mesh pattern ────────────────────────────────── */
-.diamond-mesh {
-  background-image:
-    repeating-linear-gradient(45deg, rgba(232, 121, 249, 0.025) 0px, rgba(232, 121, 249, 0.025) 1px, transparent 1px, transparent 36px),
-    repeating-linear-gradient(-45deg, rgba(232, 121, 249, 0.025) 0px, rgba(232, 121, 249, 0.025) 1px, transparent 1px, transparent 36px);
+/* ── Minimalist Inputs & Buttons ────────────────────────────────────────── */
+.input-clean {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* Finer inner diamond overlay */
-.diamond-mesh::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    repeating-linear-gradient(45deg, rgba(167, 139, 250, 0.015) 0, rgba(167, 139, 250, 0.015) 1px, transparent 1px, transparent 18px),
-    repeating-linear-gradient(-45deg, rgba(167, 139, 250, 0.015) 0, rgba(167, 139, 250, 0.015) 1px, transparent 1px, transparent 18px);
+.input-clean:focus {
+  outline: none;
+  border-color: var(--primary-accent);
+  box-shadow: 0 0 0 2px rgba(47, 129, 247, 0.2);
 }
 
-/* ── Glow orbs ───────────────────────────────────────────── */
-.orb-fuchsia {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  background: radial-gradient(circle, rgba(232, 121, 249, 0.18) 0%, transparent 70%);
-  filter: blur(50px);
+.btn-primary {
+  background-color: var(--primary-accent);
+  color: #ffffff;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
 }
 
-.orb-violet {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  background: radial-gradient(circle, rgba(167, 139, 250, 0.14) 0%, transparent 70%);
-  filter: blur(60px);
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--primary-hover);
 }
 
-.orb-gold {
-  position: absolute;
-  border-radius: 50%;
-  pointer-events: none;
-  background: radial-gradient(circle, rgba(251, 191, 36, 0.08) 0%, transparent 70%);
-  filter: blur(50px);
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-/* ── Gradient border card ──────────────────────────────────── */
-.jewel-card {
-  position: relative;
-  border-radius: 1.6rem;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(232, 121, 249, 0.35) 0%, rgba(167, 139, 250, 0.15) 40%, rgba(251, 191, 36, 0.1) 100%);
+.btn-secondary {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  transition: all 0.2s ease;
 }
 
-.jewel-card-inner {
-  border-radius: 1.55rem;
-  background: linear-gradient(160deg, #0f0820 0%, #0a041a 100%);
+.btn-secondary:hover {
+  background-color: var(--bg-surface-hover);
+  border-color: #848d97;
 }
 
-/* ── Premium scrollbar ───────────────────────────────────── */
+/* ── Custom Scrollbar ───────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 3px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -95,94 +80,38 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(232, 121, 249, 0.15);
-  border-radius: 10px;
+  background: var(--border-color);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(232, 121, 249, 0.3);
+  background: var(--text-secondary);
 }
 
-/* ── Text gradients ──────────────────────────────────────── */
-.text-fuchsia-grad {
-  background: linear-gradient(135deg, #e879f9, #a78bfa);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+/* ── Utilities ─────────────────────────────────────────────────── */
+.glass-panel {
+  background: rgba(22, 26, 34, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-color);
 }
 
-.text-gold-grad {
-  background: linear-gradient(135deg, #fbbf24, #f59e0b);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+.card-shadow {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
-/* ── Animations ──────────────────────────────────────────── */
-@keyframes fadeUp {
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+@keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(4px);
   }
 
   to {
     opacity: 1;
     transform: translateY(0);
   }
-}
-
-@keyframes softPulse {
-
-  0%,
-  100% {
-    opacity: 0.8;
-  }
-
-  50% {
-    opacity: 1;
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -400% center;
-  }
-
-  100% {
-    background-position: 400% center;
-  }
-}
-
-.animate-fade-up {
-  animation: fadeUp 0.4s ease-out forwards;
-}
-
-.animate-soft-pulse {
-  animation: softPulse 2.5s ease-in-out infinite;
-}
-
-/* ── Jewel button ────────────────────────────────────────── */
-.btn-jewel {
-  background: linear-gradient(135deg, #e879f9, #a78bfa 60%, #fbbf24);
-  color: #08040f;
-  font-weight: 800;
-  font-family: 'Syne', sans-serif;
-  border: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 6px 28px rgba(232, 121, 249, 0.3), 0 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-.btn-jewel:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 36px rgba(232, 121, 249, 0.42), 0 2px 8px rgba(0, 0, 0, 0.5);
-}
-
-.btn-jewel:active {
-  transform: scale(0.97);
-}
-
-/* ── Syne headings ───────────────────────────────────────── */
-.font-syne {
-  font-family: 'Syne', sans-serif;
 }
