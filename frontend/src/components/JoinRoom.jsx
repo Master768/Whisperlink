@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, ArrowRight, Zap, Hash, User, Eye, EyeOff, RefreshCw, Shuffle, Lock } from 'lucide-react';
+import { Shield, ArrowRight, Zap, Hash, Eye, EyeOff, RefreshCw, Shuffle, Lock } from 'lucide-react';
 
 const SARCASTIC_NAMES = [
     'SelfProclaimed Genius', 'Professionally Mediocre', 'Technically Not Wrong',
@@ -48,181 +48,164 @@ const getRandomName = () => SARCASTIC_NAMES[Math.floor(Math.random() * SARCASTIC
 const JoinRoom = ({ onJoin }) => {
     const [roomId, setRoomId] = useState('');
     const [secretPhrase, setSecretPhrase] = useState('');
-    const [username, setUsername] = useState(() => getRandomName());
+    const [username, setUsername] = useState(getRandomName);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
 
-    const generateRoomCode = () => {
-        setRoomId(Math.floor(10000 + Math.random() * 90000).toString());
-        setError('');
-    };
+    const generateRoomCode = () => { setRoomId(Math.floor(10000 + Math.random() * 90000).toString()); setError(''); };
 
     const handleSubmit = async (e) => {
-        e.preventDefault();
+        e?.preventDefault();
         setError('');
         if (!username || username.trim().length < 2) { setError('Alias must be at least 2 characters'); return; }
-        if (roomId && roomId.trim().length < 4) { setError('Room coordinate must be at least 4 characters'); return; }
+        if (roomId && roomId.trim().length < 4) { setError('Room ID must be at least 4 characters'); return; }
         if (!secretPhrase || secretPhrase.length < 4) { setError('Cipher key must be at least 4 characters'); return; }
-
         setIsLoading(true);
         try {
             const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
-            const response = await fetch(`${backendUrl}/api/rooms`, {
+            const res = await fetch(`${backendUrl}/api/rooms`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ roomId: roomId.trim() || undefined, secretPhrase })
             });
-            const data = await response.json();
-            if (response.ok) {
-                onJoin(data.roomId, secretPhrase, username.trim(), data.createdAt);
-            } else {
-                setError(data.error || 'Access Denied');
-            }
-        } catch {
-            setError('Server unreachable. Check your connection.');
-        } finally {
-            setIsLoading(false);
-        }
+            const data = await res.json();
+            if (res.ok) { onJoin(data.roomId, secretPhrase, username.trim(), data.createdAt); }
+            else { setError(data.error || 'Access Denied'); }
+        } catch { setError('Server unreachable. Check your connection.'); }
+        finally { setIsLoading(false); }
     };
 
     return (
-        <div className="min-h-[100dvh] flex flex-col items-center justify-center relative overflow-hidden font-sans px-4 py-8"
-            style={{ background: 'radial-gradient(ellipse 80% 60% at 20% 10%, rgba(16,217,160,0.07) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 80% 90%, rgba(59,130,246,0.06) 0%, transparent 60%), #07080f' }}>
-
-            {/* Grid overlay */}
-            <div className="absolute inset-0 pointer-events-none opacity-[0.03]"
-                style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+        <div className="diamond-mesh min-h-[100dvh] flex flex-col items-center justify-center relative overflow-hidden px-4 py-10"
+            style={{ background: 'radial-gradient(ellipse 90% 70% at 15% 5%, rgba(232,121,249,0.12) 0%, transparent 55%), radial-gradient(ellipse 70% 60% at 85% 95%, rgba(167,139,250,0.1) 0%, transparent 55%), radial-gradient(ellipse 50% 40% at 50% 50%, rgba(251,191,36,0.04) 0%, transparent 70%), #08040f' }}>
 
             {/* Glow orbs */}
-            <div className="absolute top-[10%] left-[5%] w-72 h-72 rounded-full pointer-events-none"
-                style={{ background: 'radial-gradient(circle, rgba(16,217,160,0.08) 0%, transparent 70%)', filter: 'blur(40px)' }} />
-            <div className="absolute bottom-[5%] right-[5%] w-56 h-56 rounded-full pointer-events-none"
-                style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.07) 0%, transparent 70%)', filter: 'blur(40px)' }} />
+            <div className="orb-fuchsia" style={{ width: '500px', height: '500px', top: '-15%', left: '-10%', opacity: 0.7 }} />
+            <div className="orb-violet" style={{ width: '400px', height: '400px', bottom: '-10%', right: '-8%' }} />
+            <div className="orb-gold" style={{ width: '300px', height: '300px', bottom: '20%', left: '5%', opacity: 0.5 }} />
 
-            <div className="w-full max-w-[420px] space-y-5 z-10 animate-fade-in">
+            {/* Decorative accent line top */}
+            <div className="absolute top-0 left-0 right-0 h-px"
+                style={{ background: 'linear-gradient(90deg, transparent, rgba(232,121,249,0.4), rgba(251,191,36,0.3), transparent)' }} />
+
+            <div className="w-full max-w-[420px] z-10 space-y-6 animate-fade-up">
+
                 {/* Brand */}
                 <div className="text-center space-y-4">
-                    {/* Icon with ring */}
+                    {/* Shield icon */}
                     <div className="relative inline-flex items-center justify-center">
-                        <div className="absolute inset-0 rounded-[1.4rem] animate-glow" />
-                        <div className="relative p-4 rounded-[1.4rem] border"
-                            style={{ background: 'linear-gradient(135deg, rgba(16,217,160,0.12) 0%, rgba(59,130,246,0.06) 100%)', borderColor: 'rgba(16,217,160,0.25)' }}>
-                            <Shield className="w-10 h-10" style={{ color: '#10d9a0' }} />
+                        <div className="absolute inset-0 rounded-2xl animate-soft-pulse"
+                            style={{ background: 'radial-gradient(circle, rgba(232,121,249,0.2) 0%, transparent 70%)', filter: 'blur(12px)' }} />
+                        <div className="relative p-4 rounded-2xl"
+                            style={{ background: 'linear-gradient(135deg, rgba(232,121,249,0.12), rgba(167,139,250,0.06))', border: '1px solid rgba(232,121,249,0.25)' }}>
+                            <Shield className="w-10 h-10" style={{ color: '#e879f9' }} />
                         </div>
                     </div>
+
                     <div>
-                        <h1 className="text-5xl sm:text-6xl font-black tracking-tighter italic leading-none">
-                            <span className="text-white">WHISPER</span>
-                            <span style={{ background: 'linear-gradient(135deg, #10d9a0, #3b82f6)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>LINK</span>
+                        <h1 className="font-syne text-5xl sm:text-6xl font-black tracking-tighter italic leading-none">
+                            <span style={{ color: '#fdf4ff' }}>WHISPER</span>
+                            <span className="text-fuchsia-grad">LINK</span>
                         </h1>
-                        <p className="text-[9px] mt-2 font-black tracking-[0.45em] uppercase" style={{ color: 'rgba(16,217,160,0.5)' }}>
-                            Encrypted · Ephemeral · Untraceable
-                        </p>
+                        <div className="mt-2 flex items-center justify-center gap-2">
+                            <div className="h-px flex-1 max-w-[60px]"
+                                style={{ background: 'linear-gradient(to right, transparent, rgba(232,121,249,0.3))' }} />
+                            <p className="text-[8px] font-bold tracking-[0.5em] uppercase" style={{ color: 'var(--text-3)' }}>
+                                Encrypted · Ephemeral
+                            </p>
+                            <div className="h-px flex-1 max-w-[60px]"
+                                style={{ background: 'linear-gradient(to left, transparent, rgba(232,121,249,0.3))' }} />
+                        </div>
                     </div>
                 </div>
 
                 {/* Card */}
-                <div className="relative rounded-[1.6rem] p-[1px]"
-                    style={{ background: 'linear-gradient(135deg, rgba(16,217,160,0.25) 0%, rgba(59,130,246,0.12) 50%, rgba(255,255,255,0.04) 100%)' }}>
-                    <div className="rounded-[1.55rem] p-6 sm:p-8 space-y-4"
-                        style={{ background: 'linear-gradient(160deg, #0e101a 0%, #0a0c14 100%)' }}>
+                <div className="jewel-card">
+                    <div className="jewel-card-inner p-6 sm:p-8 space-y-5">
 
-                        {/* Username */}
+                        {/* Alias */}
                         <div className="space-y-1.5">
-                            <label className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.35em]" style={{ color: 'rgba(16,217,160,0.6)' }}>
-                                <span>Alias</span><span style={{ color: 'rgba(255,255,255,0.2)' }}>· min 2</span>
+                            <label className="text-[9px] font-bold uppercase tracking-[0.35em]" style={{ color: 'rgba(232,121,249,0.55)' }}>
+                                ALIAS <span style={{ color: 'var(--text-3)' }}>· min 2</span>
                             </label>
                             <div className="flex gap-2">
-                                <div className="relative flex-1 group">
-                                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors" style={{ color: 'rgba(255,255,255,0.25)' }} />
-                                    <input type="text" placeholder="Your sarcastic alias..."
-                                        className="w-full pl-10 pr-3 py-3 rounded-xl text-sm font-medium italic transition-all duration-200"
-                                        style={{
-                                            background: 'rgba(255,255,255,0.03)',
-                                            border: '1px solid rgba(255,255,255,0.07)',
-                                            color: '#f0f0f8',
-                                        }}
-                                        onFocus={e => { e.target.style.border = '1px solid rgba(16,217,160,0.35)'; e.target.style.background = 'rgba(16,217,160,0.05)'; }}
-                                        onBlur={e => { e.target.style.border = '1px solid rgba(255,255,255,0.07)'; e.target.style.background = 'rgba(255,255,255,0.03)'; }}
-                                        value={username}
-                                        onChange={e => setUsername(e.target.value)}
-                                        maxLength={30} required
-                                    />
-                                </div>
+                                <input type="text" value={username} onChange={e => setUsername(e.target.value)}
+                                    placeholder="Your sarcastic alias..." maxLength={30}
+                                    className="flex-1 min-w-0 px-4 py-3 rounded-xl text-sm font-medium italic outline-none transition-all"
+                                    style={{ background: 'rgba(232,121,249,0.04)', border: '1px solid rgba(232,121,249,0.1)', color: 'var(--text-1)' }}
+                                    onFocus={e => { e.target.style.border = '1px solid rgba(232,121,249,0.4)'; e.target.style.background = 'rgba(232,121,249,0.07)'; }}
+                                    onBlur={e => { e.target.style.border = '1px solid rgba(232,121,249,0.1)'; e.target.style.background = 'rgba(232,121,249,0.04)'; }}
+                                />
                                 <button type="button" onClick={() => setUsername(getRandomName())}
-                                    title="Shuffle alias"
-                                    className="shrink-0 px-3 rounded-xl transition-all active:scale-95"
-                                    style={{ background: 'rgba(16,217,160,0.08)', border: '1px solid rgba(16,217,160,0.2)' }}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(16,217,160,0.15)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(16,217,160,0.08)'}>
-                                    <Shuffle className="w-4 h-4" style={{ color: '#10d9a0' }} />
+                                    className="shrink-0 px-3.5 rounded-xl transition-all active:scale-90"
+                                    style={{ background: 'rgba(232,121,249,0.08)', border: '1px solid rgba(232,121,249,0.2)' }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(232,121,249,0.16)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(232,121,249,0.08)'}>
+                                    <Shuffle className="w-4 h-4" style={{ color: '#e879f9' }} />
                                 </button>
                             </div>
                         </div>
 
                         {/* Room ID */}
                         <div className="space-y-1.5">
-                            <label className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.35em]" style={{ color: 'rgba(16,217,160,0.6)' }}>
-                                <span>Room Coordinate</span><span style={{ color: 'rgba(255,255,255,0.2)' }}>· optional, min 4</span>
+                            <label className="text-[9px] font-bold uppercase tracking-[0.35em]" style={{ color: 'rgba(232,121,249,0.55)' }}>
+                                ROOM <span style={{ color: 'var(--text-3)' }}>· optional, min 4</span>
                             </label>
                             <div className="flex gap-2">
                                 <div className="relative flex-1">
-                                    <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
-                                    <input type="text" placeholder="Enter or generate a code..."
-                                        className="w-full pl-10 pr-3 py-3 rounded-xl text-sm font-medium italic transition-all duration-200"
-                                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: '#f0f0f8' }}
-                                        onFocus={e => { e.target.style.border = '1px solid rgba(16,217,160,0.35)'; e.target.style.background = 'rgba(16,217,160,0.05)'; }}
-                                        onBlur={e => { e.target.style.border = '1px solid rgba(255,255,255,0.07)'; e.target.style.background = 'rgba(255,255,255,0.03)'; }}
-                                        value={roomId}
-                                        onChange={e => setRoomId(e.target.value)}
-                                        maxLength={12}
+                                    <Hash className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(232,121,249,0.3)' }} />
+                                    <input type="text" value={roomId} onChange={e => setRoomId(e.target.value)}
+                                        placeholder="Enter or generate..." maxLength={12}
+                                        className="w-full pl-10 pr-4 py-3 rounded-xl text-sm font-medium italic outline-none transition-all"
+                                        style={{ background: 'rgba(232,121,249,0.04)', border: '1px solid rgba(232,121,249,0.1)', color: 'var(--text-1)' }}
+                                        onFocus={e => { e.target.style.border = '1px solid rgba(232,121,249,0.4)'; e.target.style.background = 'rgba(232,121,249,0.07)'; }}
+                                        onBlur={e => { e.target.style.border = '1px solid rgba(232,121,249,0.1)'; e.target.style.background = 'rgba(232,121,249,0.04)'; }}
                                     />
                                 </div>
                                 <button type="button" onClick={generateRoomCode}
-                                    title="Generate 5-digit code"
-                                    className="shrink-0 px-3 rounded-xl transition-all active:scale-95"
-                                    style={{ background: 'rgba(16,217,160,0.08)', border: '1px solid rgba(16,217,160,0.2)' }}
-                                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(16,217,160,0.15)'}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(16,217,160,0.08)'}>
-                                    <RefreshCw className="w-4 h-4" style={{ color: '#10d9a0' }} />
+                                    className="shrink-0 px-3.5 rounded-xl transition-all active:scale-90"
+                                    style={{ background: 'rgba(232,121,249,0.08)', border: '1px solid rgba(232,121,249,0.2)' }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(232,121,249,0.16)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(232,121,249,0.08)'}>
+                                    <RefreshCw className="w-4 h-4" style={{ color: '#e879f9' }} />
                                 </button>
                             </div>
                             {roomId && (
-                                <p className="text-[9px] ml-1 italic flex items-center gap-1.5" style={{ color: 'rgba(255,255,255,0.3)' }}>
-                                    Code: <span className="font-black tracking-widest" style={{ color: '#10d9a0' }}>{roomId}</span>
-                                    {roomId.length < 4 && <span style={{ color: '#f43f5e' }}>— {4 - roomId.length} more needed</span>}
+                                <p className="text-[9px] ml-1 italic" style={{ color: 'var(--text-3)' }}>
+                                    Code: <span className="font-black tracking-widest" style={{ color: '#e879f9' }}>{roomId}</span>
+                                    {roomId.length < 4 && <span style={{ color: 'var(--error)', marginLeft: '6px' }}>need {4 - roomId.length} more</span>}
                                 </p>
                             )}
                         </div>
 
                         {/* Cipher Key */}
                         <div className="space-y-1.5">
-                            <label className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-[0.35em]" style={{ color: 'rgba(16,217,160,0.6)' }}>
-                                <span>Cipher Key</span><span style={{ color: 'rgba(255,255,255,0.2)' }}>· min 4</span>
+                            <label className="text-[9px] font-bold uppercase tracking-[0.35em]" style={{ color: 'rgba(232,121,249,0.55)' }}>
+                                CIPHER KEY <span style={{ color: 'var(--text-3)' }}>· min 4</span>
                             </label>
                             <div className="relative">
-                                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(255,255,255,0.25)' }} />
-                                <input type={showPassword ? 'text' : 'password'}
-                                    placeholder="Secret entry phrase..."
-                                    className="w-full pl-10 pr-11 py-3 rounded-xl text-sm font-medium italic transition-all duration-200"
-                                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: '#f0f0f8' }}
-                                    onFocus={e => { e.target.style.border = '1px solid rgba(16,217,160,0.35)'; e.target.style.background = 'rgba(16,217,160,0.05)'; }}
-                                    onBlur={e => { e.target.style.border = '1px solid rgba(255,255,255,0.07)'; e.target.style.background = 'rgba(255,255,255,0.03)'; }}
-                                    value={secretPhrase}
+                                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'rgba(232,121,249,0.3)' }} />
+                                <input type={showPassword ? 'text' : 'password'} value={secretPhrase}
                                     onChange={e => setSecretPhrase(e.target.value)}
-                                    required
+                                    placeholder="Secret entry phrase..."
+                                    className="w-full pl-10 pr-11 py-3 rounded-xl text-sm font-medium italic outline-none transition-all"
+                                    style={{ background: 'rgba(232,121,249,0.04)', border: '1px solid rgba(232,121,249,0.1)', color: 'var(--text-1)' }}
+                                    onFocus={e => { e.target.style.border = '1px solid rgba(232,121,249,0.4)'; e.target.style.background = 'rgba(232,121,249,0.07)'; }}
+                                    onBlur={e => { e.target.style.border = '1px solid rgba(232,121,249,0.1)'; e.target.style.background = 'rgba(232,121,249,0.04)'; }}
                                 />
                                 <button type="button" onClick={() => setShowPassword(!showPassword)}
                                     className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
-                                    style={{ color: 'rgba(255,255,255,0.3)' }}
-                                    onMouseEnter={e => e.currentTarget.style.color = '#10d9a0'}
-                                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}>
+                                    style={{ color: 'rgba(232,121,249,0.3)' }}
+                                    onMouseEnter={e => e.currentTarget.style.color = '#e879f9'}
+                                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(232,121,249,0.3)'}>
                                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 </button>
                             </div>
                             {secretPhrase.length > 0 && secretPhrase.length < 4 && (
-                                <p className="text-[9px] italic ml-1" style={{ color: '#f43f5e' }}>{4 - secretPhrase.length} more character{4 - secretPhrase.length > 1 ? 's' : ''} needed</p>
+                                <p className="text-[9px] ml-1 italic" style={{ color: 'var(--error)' }}>
+                                    {4 - secretPhrase.length} more character{4 - secretPhrase.length > 1 ? 's' : ''} needed
+                                </p>
                             )}
                         </div>
 
@@ -230,21 +213,19 @@ const JoinRoom = ({ onJoin }) => {
                         {error && (
                             <div className="py-2.5 rounded-xl text-center"
                                 style={{ background: 'rgba(244,63,94,0.07)', border: '1px solid rgba(244,63,94,0.2)' }}>
-                                <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#f43f5e' }}>{error}</span>
+                                <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: 'var(--error)' }}>
+                                    {error}
+                                </span>
                             </div>
                         )}
 
                         {/* Submit */}
-                        <button type="button" onClick={handleSubmit}
-                            disabled={isLoading}
-                            className="w-full flex items-center justify-center gap-3 py-4 rounded-xl font-black transition-all duration-200 active:scale-[0.98] relative overflow-hidden group"
-                            style={isLoading
-                                ? { background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.05)', cursor: 'not-allowed' }
-                                : { background: 'linear-gradient(135deg, #10d9a0 0%, #0ea5e9 100%)', color: '#07080f', boxShadow: '0 8px 32px rgba(16,217,160,0.25), 0 2px 8px rgba(0,0,0,0.5)' }
-                            }
-                            onMouseEnter={e => { if (!isLoading) e.currentTarget.style.boxShadow = '0 12px 40px rgba(16,217,160,0.35), 0 2px 8px rgba(0,0,0,0.5)'; }}
-                            onMouseLeave={e => { if (!isLoading) e.currentTarget.style.boxShadow = '0 8px 32px rgba(16,217,160,0.25), 0 2px 8px rgba(0,0,0,0.5)'; }}>
-                            <span className="uppercase tracking-[0.15em] text-sm">{isLoading ? 'Establishing...' : 'Establish Connection'}</span>
+                        <button type="button" onClick={handleSubmit} disabled={isLoading}
+                            className="btn-jewel w-full flex items-center justify-center gap-3 py-4 rounded-xl text-sm"
+                            style={isLoading ? { opacity: 0.5, cursor: 'not-allowed', pointerEvents: 'none' } : {}}>
+                            <span className="font-syne font-black tracking-[0.12em] uppercase">
+                                {isLoading ? 'Establishing...' : 'Establish Connection'}
+                            </span>
                             {!isLoading && <ArrowRight className="w-5 h-5" />}
                         </button>
                     </div>
@@ -256,18 +237,22 @@ const JoinRoom = ({ onJoin }) => {
                         { icon: <Zap className="w-4 h-4" />, label: 'Auto-Shred', value: '45 Min' },
                         { icon: <Shield className="w-4 h-4" />, label: 'Zero Logs', value: 'Encrypted' },
                     ].map(({ icon, label, value }) => (
-                        <div key={label} className="flex items-center gap-3 p-3.5 rounded-xl transition-all"
-                            style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
-                            onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(16,217,160,0.2)'}
-                            onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)'}>
-                            <div className="p-2 rounded-lg" style={{ background: 'rgba(16,217,160,0.08)', color: '#10d9a0' }}>{icon}</div>
+                        <div key={label} className="flex items-center gap-3 p-3.5 rounded-xl transition-all cursor-default"
+                            style={{ background: 'rgba(232,121,249,0.03)', border: '1px solid rgba(232,121,249,0.08)' }}
+                            onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(232,121,249,0.2)'}
+                            onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(232,121,249,0.08)'}>
+                            <div className="p-2 rounded-lg" style={{ background: 'rgba(232,121,249,0.08)', color: '#e879f9' }}>{icon}</div>
                             <div>
-                                <p className="text-[8px] uppercase font-black tracking-wider" style={{ color: 'rgba(255,255,255,0.3)' }}>{label}</p>
-                                <p className="text-xs font-bold" style={{ color: '#f0f0f8' }}>{value}</p>
+                                <p className="text-[8px] uppercase font-black tracking-wider" style={{ color: 'var(--text-3)' }}>{label}</p>
+                                <p className="text-xs font-bold" style={{ color: 'var(--text-1)' }}>{value}</p>
                             </div>
                         </div>
                     ))}
                 </div>
+
+                {/* Bottom accent line */}
+                <div className="h-px mx-8"
+                    style={{ background: 'linear-gradient(90deg, transparent, rgba(251,191,36,0.25), rgba(232,121,249,0.2), transparent)' }} />
             </div>
         </div>
     );
