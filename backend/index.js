@@ -25,7 +25,14 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Ensure uploads directory exists on startup
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log('Created uploads directory');
+}
+
+app.use('/uploads', express.static(uploadsDir));
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGODB_URI)
@@ -57,13 +64,23 @@ const upload = multer({
 app.post('/api/rooms', async (req, res) => {
     let { roomId, secretPhrase } = req.body;
     try {
+        console.log(`[API] Room request: roomId=${roomId}, secretPhrase=${secretPhrase ? '****' : 'none'}`);
+
+        // Ensure database is connected
+        if (mongoose.connection.readyState !== 1) {
+            console.error('[API] Database not connected. State:', mongoose.connection.readyState);
+            return res.status(503).json({ error: 'Database connection unstable. Retrying...' });
+        }
+
         // If no roomId is provided, generate a unique 6-digit numeric ID
         if (!roomId) {
             let isUnique = false;
-            while (!isUnique) {
+            let attempts = 0;
+            while (!isUnique && attempts < 10) {
                 roomId = Math.floor(100000 + Math.random() * 900000).toString();
                 const existing = await Room.findOne({ roomId });
                 if (!existing) isUnique = true;
+                attempts++;
             }
         }
 
@@ -84,8 +101,8 @@ app.post('/api/rooms', async (req, res) => {
             return res.status(201).json({ message: 'Room created successfully', roomId, createdAt: room.createdAt });
         }
     } catch (err) {
-        console.error('Room error:', err);
-        res.status(500).json({ error: 'Server error' });
+        console.error('[API] Room error details:', err.message);
+        res.status(500).json({ error: `Server error: ${err.message}` });
     }
 });
 
