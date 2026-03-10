@@ -36,10 +36,11 @@ function App() {
     setViewChat(true);
   };
 
-  // Full leave: clears session AND messages
+  // Full leave: clears session AND stored messages
   const handleLeave = () => {
     if (roomData) {
-      sessionStorage.removeItem(`wl_messages_${roomData.roomId}`);
+      localStorage.removeItem(`wl_messages_${roomData.roomId}`);
+      localStorage.removeItem(`wl_expiry_${roomData.roomId}`);
     }
     localStorage.removeItem('whisperlink_session');
     setRoomData(null);

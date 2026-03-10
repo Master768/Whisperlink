@@ -1,10 +1,54 @@
 import React, { useState } from 'react';
-import { Shield, ArrowRight, Zap, Hash, User, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Shield, ArrowRight, Zap, Hash, User, Eye, EyeOff, RefreshCw, Shuffle } from 'lucide-react';
+
+const SARCASTIC_NAMES = [
+    'SelfProclaimed Genius', 'Professionally Mediocre', 'Technically Not Wrong',
+    'Obviously Right Again', 'Unsolicited Opinion', 'Reluctant Participant',
+    'Definitely Future Legend', 'Questionably Present', 'Master of Obvious',
+    'Barely Trying', 'Gloriously Average', 'Suspiciously Confident',
+    'Politely Disagreeable', 'Honestly Confused', 'Perfectly Fine Thanks',
+    'Definitely Not Lost', 'Mildly Concerned', 'Casually Brilliant',
+    'Professionally Unavailable', 'Expert in Everything',
+    'Gracefully Mistaken', 'Technically Alive', 'Appropriately Caffeinated',
+    'Pleasantly Oblivious', 'Enthusiastically Wrong', 'Suspiciously Normal',
+    'Effortlessly Clueless', 'Subtly Judging', 'Clearly Overqualified',
+    'Deeply Unbothered', 'Famously Humble', 'Silently Judging',
+    'Perpetually Early', 'Aggressively Average', 'Precisely Imprecise',
+    'Cheerfully Sarcastic', 'Unnecessarily Specific', 'Defiantly Mediocre',
+    'Fluent in Sarcasm', 'Always Almost Ready', 'Perpetually Surprised',
+    'Boldly Incorrect', 'Professionally Confused', 'Simply Misunderstood',
+    'Totally Paying Attention', 'Clearly the Favorite', 'Surprisingly Coherent',
+    'Mildly Functional', 'Exceptional Napper', 'Obviously the Smartest',
+    'Coincidentally Present', 'Professionally Overthinking',
+    'Technically Competent', 'Deeply Unimpressed', 'Blissfully Unaware',
+    'Spectacularly Irrelevant', 'Humbly Excellent', 'Certainly Not Nervous',
+    'Genuinely Skeptical', 'Absolutely Volunteered', 'Probably Fine',
+    'Reluctant Hero', 'Thoughtfully Absent', 'Always Misquoted',
+    'Highly Specific Nobody', 'Moderately Enlightened', 'Suspiciously Helpful',
+    'Terminally Online', 'Certified People Person', 'Self Taught Expert',
+    'Frequently Misunderstood', 'Delightfully Incorrect', 'Boldly Underprepared',
+    'Vaguely Interested', 'Perpetually Right', 'Accidentally Insightful',
+    'Unapologetically Late', 'Casually Overachieving', 'Professionally Dramatic',
+    'Obviously Joking', 'Kindly Disagreeing', 'Completely Distracted',
+    'Absolutely Listening', 'Technically Qualified', 'Tragically Overlooked',
+    'Quietly Judging Everyone', 'Deeply Fascinated', 'Definitively Wrong',
+    'Professionally Napping', 'Genuinely Attempting', 'Remarkably Ordinary',
+    'Thoroughly Unconvinced', 'Supremely Unbothered', 'Barely Caffeinated',
+    'Aggressively Calm', 'Mildly Legendary', 'Expertly Pretending',
+    'Suspiciously Polite', 'Nearly Functional', 'Actually Trying',
+    'Diplomatically Blunt', 'Objectively Phenomenal', 'Genuinely Bewildered',
+    'Technically Present', 'Obviously Overthinking', 'Casually Unhinged',
+    'Professionally Lost', 'Vigorously Neutral', 'Dangerously Optimistic',
+    'Quietly Exceptional', 'Confidently Incorrect', 'Softly Judgemental',
+    'Firmly Undecided',
+];
+
+const getRandomName = () => SARCASTIC_NAMES[Math.floor(Math.random() * SARCASTIC_NAMES.length)];
 
 const JoinRoom = ({ onJoin }) => {
     const [roomId, setRoomId] = useState('');
     const [secretPhrase, setSecretPhrase] = useState('');
-    const [username, setUsername] = useState('');
+    const [username, setUsername] = useState(() => getRandomName()); // start with a random sarcastic name
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -89,17 +133,28 @@ const JoinRoom = ({ onJoin }) => {
                         <label className="block text-[9px] font-black text-white/50 uppercase tracking-[0.3em] ml-1">
                             Identify As <span className="text-white/30">(min 2)</span>
                         </label>
-                        <div className="relative group">
-                            <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-primary transition-colors" />
-                            <input
-                                type="text"
-                                placeholder="Assign alias..."
-                                className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl pl-11 pr-4 py-3.5 focus:outline-none focus:border-primary/40 focus:bg-white/[0.04] transition-all text-sm font-medium text-white placeholder:text-white/30 italic"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                                maxLength={20}
-                                required
-                            />
+                        <div className="flex gap-2">
+                            <div className="relative group flex-1">
+                                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-primary transition-colors" />
+                                <input
+                                    type="text"
+                                    placeholder="Assign alias..."
+                                    className="w-full bg-white/[0.02] border border-white/[0.06] rounded-xl pl-11 pr-4 py-3.5 focus:outline-none focus:border-primary/40 focus:bg-white/[0.04] transition-all text-sm font-medium text-white placeholder:text-white/30 italic"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                    maxLength={30}
+                                    required
+                                />
+                            </div>
+                            {/* Random sarcastic name generator */}
+                            <button
+                                type="button"
+                                onClick={() => setUsername(getRandomName())}
+                                title="Pick a random sarcastic alias"
+                                className="shrink-0 px-3 py-3 rounded-xl bg-primary/10 border border-primary/20 hover:bg-primary/20 hover:border-primary/40 transition-all active:scale-95 group"
+                            >
+                                <Shuffle className="w-4 h-4 text-primary group-hover:rotate-180 transition-transform duration-300" />
+                            </button>
                         </div>
                     </div>
 

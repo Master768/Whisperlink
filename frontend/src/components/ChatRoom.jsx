@@ -27,13 +27,22 @@ function getFileLabel(filename) {
 
 const TYPING_TIMEOUT = 2500; // ms of inactivity before stop event fires
 
+// localStorage key for messages — persists across page reloads (unlike sessionStorage which mobile browsers clear)
 const MSG_KEY = (roomId) => `wl_messages_${roomId}`;
+const MSG_EXPIRY_KEY = (roomId) => `wl_expiry_${roomId}`;
 
 const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
-    // Load saved messages from sessionStorage so they survive back-button navigation
+    // Load saved messages from localStorage — survives back button + mobile page reloads
     const [messages, setMessages] = useState(() => {
         try {
-            const saved = sessionStorage.getItem(MSG_KEY(roomId));
+            // If room has expired, don't load stale messages
+            const expiryStr = localStorage.getItem(MSG_EXPIRY_KEY(roomId));
+            if (expiryStr && Date.now() > Number(expiryStr)) {
+                localStorage.removeItem(MSG_KEY(roomId));
+                localStorage.removeItem(MSG_EXPIRY_KEY(roomId));
+                return [];
+            }
+            const saved = localStorage.getItem(MSG_KEY(roomId));
             return saved ? JSON.parse(saved) : [];
         } catch { return []; }
     });
@@ -53,12 +62,17 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
     const typingTimerRef = useRef(null);
     const isTypingRef = useRef(false);
 
-    // Persist messages to sessionStorage on every update
+    // Persist messages to localStorage on every update
     useEffect(() => {
         try {
-            sessionStorage.setItem(MSG_KEY(roomId), JSON.stringify(messages));
-        } catch { /* quota exceeded / private mode — silently ignore */ }
-    }, [messages, roomId]);
+            localStorage.setItem(MSG_KEY(roomId), JSON.stringify(messages));
+            // Store expiry time (45 min from room creation) so we can clean up stale messages
+            if (createdAt && !localStorage.getItem(MSG_EXPIRY_KEY(roomId))) {
+                const expiry = new Date(createdAt).getTime() + (45 * 60 * 1000);
+                localStorage.setItem(MSG_EXPIRY_KEY(roomId), String(expiry));
+            }
+        } catch { /* storage full — silently ignore */ }
+    }, [messages, roomId, createdAt]);
 
     // Timer Logic
     useEffect(() => {
@@ -72,7 +86,9 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
             if (difference <= 0) {
                 setTimeLeft('00:00');
                 setIsShredded(true);
-                sessionStorage.removeItem(MSG_KEY(roomId)); // clear on shred
+                // Clear stored messages on shred
+                localStorage.removeItem(MSG_KEY(roomId));
+                localStorage.removeItem(MSG_EXPIRY_KEY(roomId));
                 clearInterval(timerInterval);
                 return;
             }
