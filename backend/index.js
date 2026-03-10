@@ -120,6 +120,7 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
 
 // Socket.io Logic
 const roomUsers = {}; // { roomId: [{ id: socketId, name: username }] }
+const disconnectTimers = {}; // { `${roomId}:${username}`: timeoutId }
 
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
@@ -130,6 +131,18 @@ io.on('connection', (socket) => {
         socket.join(roomId);
         socket.username = username || 'Anonymous';
         socket.roomId = roomId;
+
+        const timerKey = `${roomId}:${socket.username}`;
+
+        // Check if this user is reconnecting within the grace period
+        const isReconnecting = !!disconnectTimers[timerKey];
+
+        if (isReconnecting) {
+            // Cancel the pending "user left" broadcast
+            clearTimeout(disconnectTimers[timerKey]);
+            delete disconnectTimers[timerKey];
+            console.log(`[Socket] ${socket.username} reconnected to ${roomId} (grace period active, no leave/join messages)`);
+        }
 
         if (!roomUsers[roomId]) {
             roomUsers[roomId] = [];
@@ -142,28 +155,28 @@ io.on('connection', (socket) => {
             roomUsers[roomId].push({ id: socket.id, name: socket.username });
         }
 
-        console.log(`[Socket] ${socket.username} joined ${roomId}. Count: ${roomUsers[roomId].length}`);
-
+        // Always broadcast updated room data (user count / list)
         io.to(roomId).emit('room_data', {
             userCount: roomUsers[roomId].length,
             users: roomUsers[roomId],
-            createdAt: roomUsers[roomId].length === 1 ? new Date() : undefined // We'll get this from DB for existing rooms
         });
 
-        // System notification
-        socket.to(roomId).emit('receive_message', {
-            sender: 'system',
-            username: 'WhisperLink',
-            message: `${socket.username} has entered the room.`,
-            type: 'system',
-            timestamp: new Date()
-        });
+        // Only send join notification if this is a fresh join (not a reconnect)
+        if (!isReconnecting) {
+            console.log(`[Socket] ${socket.username} joined ${roomId}. Count: ${roomUsers[roomId].length}`);
+            socket.to(roomId).emit('receive_message', {
+                sender: 'system',
+                username: 'WhisperLink',
+                message: `${socket.username} has entered the room.`,
+                type: 'system',
+                timestamp: new Date()
+            });
+        }
     });
 
     socket.on('send_message', async (data) => {
         const { roomId, message, type, fileName, fileUrl } = data;
 
-        // Broadcast message to room members
         io.to(roomId).emit('receive_message', {
             sender: socket.id,
             username: socket.username || 'Anonymous',
@@ -177,9 +190,7 @@ io.on('connection', (socket) => {
         // Update room activity
         try {
             const room = await Room.findOne({ roomId });
-            if (room) {
-                await room.updateActivity();
-            }
+            if (room) await room.updateActivity();
         } catch (err) {
             console.error('Error updating room activity:', err);
         }
@@ -188,9 +199,28 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
         const roomId = socket.roomId;
-        if (roomId && roomUsers[roomId]) {
-            const username = socket.username || 'Anonymous';
-            roomUsers[roomId] = roomUsers[roomId].filter(u => u.id !== socket.id);
+        const username = socket.username || 'Anonymous';
+
+        if (!roomId || !roomUsers[roomId]) return;
+
+        // Remove this socket from the room immediately
+        roomUsers[roomId] = roomUsers[roomId].filter(u => u.id !== socket.id);
+
+        // Update count for remaining users right away (so sidebar count is accurate)
+        if (roomUsers[roomId] && roomUsers[roomId].length > 0) {
+            io.to(roomId).emit('room_data', {
+                userCount: roomUsers[roomId].length,
+                users: roomUsers[roomId]
+            });
+        }
+
+        const timerKey = `${roomId}:${username}`;
+
+        // Grace period: wait 10 seconds before broadcasting "left" message
+        // This handles mobile app-switching / background tab drops
+        disconnectTimers[timerKey] = setTimeout(() => {
+            delete disconnectTimers[timerKey];
+            console.log(`[Socket] ${username} confirmed left ${roomId} (grace period elapsed)`);
 
             // Broadcast exit message
             io.to(roomId).emit('receive_message', {
@@ -201,15 +231,17 @@ io.on('connection', (socket) => {
                 timestamp: new Date()
             });
 
-            if (roomUsers[roomId].length === 0) {
-                delete roomUsers[roomId];
-            } else {
-                io.to(roomId).emit('room_data', {
-                    userCount: roomUsers[roomId].length,
-                    users: roomUsers[roomId]
-                });
+            if (roomUsers[roomId]) {
+                if (roomUsers[roomId].length === 0) {
+                    delete roomUsers[roomId];
+                } else {
+                    io.to(roomId).emit('room_data', {
+                        userCount: roomUsers[roomId].length,
+                        users: roomUsers[roomId]
+                    });
+                }
             }
-        }
+        }, 10000); // 10-second grace period
     });
 });
 
