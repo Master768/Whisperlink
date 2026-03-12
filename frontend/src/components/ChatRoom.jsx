@@ -432,27 +432,68 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                                 <div className={`flex flex-col max-w-[80%] sm:max-w-[65%] gap-1 ${isMe ? 'items-end' : 'items-start'}`}>
                                     {!isMe && <span className="text-xs font-medium ml-1" style={{ color: uc }}>{msg.username}</span>}
 
-                                    <div className={`px-4 py-3 rounded-2xl relative group ${isMe ? 'bg-[var(--primary-accent)] text-white' : 'bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-primary)]'}`}
+                                    <div className={`px-4 py-3 rounded-2xl relative group/bubble ${isMe ? 'bg-[var(--primary-accent)] text-white' : 'bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-primary)]'}`}
                                         style={{ borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px' }}>
 
+                                        {/* Action Menu (Hover on Desktop, Always visible on mobile) */}
+                                        <div className={`absolute -top-3 ${isMe ? 'right-0' : 'left-0'} flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-xl opacity-0 group-hover/bubble:opacity-100 md:group-hover/bubble:opacity-100 transition-all z-30 scale-90 group-hover/bubble:scale-100 max-md:opacity-100 max-md:scale-100 max-md:static max-md:mt-2 max-md:bg-transparent max-md:border-none max-md:shadow-none`}>
+                                            <div className="flex items-center gap-1 max-md:bg-black/10 max-md:p-1 max-md:rounded-lg">
+                                                {msg.type === 'file' && (
+                                                    <>
+                                                        <button onClick={(e) => { e.stopPropagation(); handleFilePreview(msg.fileName, msg.fileUrl); }} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Preview">
+                                                            <Eye className="w-3.5 h-3.5" />
+                                                        </button>
+                                                        <a href={msg.fileUrl} download={msg.fileName} onClick={e => e.stopPropagation()} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Download">
+                                                            <Download className="w-3.5 h-3.5" />
+                                                        </a>
+                                                    </>
+                                                )}
+                                                <button onClick={(e) => { e.stopPropagation(); handleCopy(msg.message || msg.fileName, i); }} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Copy">
+                                                    {copiedId === i ? <Check className="w-3.5 h-3.5 text-[var(--success)]" /> : <Copy className="w-3.5 h-3.5" />}
+                                                </button>
+                                                {isMe && msg.type === 'text' && (new Date() - new Date(msg.timestamp)) < 300000 && !editingId && (
+                                                    <button onClick={(e) => { e.stopPropagation(); handleEdit(msg); }} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Edit">
+                                                        <Pencil className="w-3.5 h-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                            {msg.type === 'file' && (
+                                                <>
+                                                    <button onClick={() => handleFilePreview(msg.fileName, msg.fileUrl)} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Preview">
+                                                        <Eye className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <a href={msg.fileUrl} download={msg.fileName} onClick={e => e.stopPropagation()} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Download">
+                                                        <Download className="w-3.5 h-3.5" />
+                                                    </a>
+                                                </>
+                                            )}
+                                            {msg.type === 'text' && (
+                                                <>
+                                                    {isMe && (new Date() - new Date(msg.timestamp)) < 300000 && !editingId && (
+                                                        <button onClick={() => handleEdit(msg)} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Edit">
+                                                            <Pencil className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                    <button onClick={() => handleCopy(msg.message, i)} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Copy">
+                                                        {copiedId === i ? <Check className="w-3.5 h-3.5 text-[var(--success)]" /> : <Copy className="w-3.5 h-3.5" />}
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+
                                         {msg.type === 'file' ? (
-                                            <div onClick={() => handleFilePreview(msg.fileName, msg.fileUrl)} className="flex items-center gap-3 group max-w-full overflow-hidden cursor-pointer select-none">
+                                            <div onClick={() => handleFilePreview(msg.fileName, msg.fileUrl)} className="flex items-center gap-3 max-w-full overflow-hidden cursor-pointer select-none">
                                                 <div className={`p-2 shrink-0 rounded-lg ${isMe ? 'bg-black/20' : 'bg-[var(--bg-main)] border border-[var(--border-color)]'}`}>
                                                     <Paperclip className="w-5 h-5" />
                                                 </div>
-                                                <div className="flex-1 min-w-0 pr-1 overflow-hidden">
+                                                <div className="flex-1 min-w-0 pr-1">
                                                     <p className="text-sm font-semibold truncate" title={msg.fileName}>{truncateFileName(msg.fileName)}</p>
                                                     <p className="text-[10px] opacity-70 uppercase tracking-wider">{getFileLabel(msg.fileName)}</p>
                                                 </div>
-                                                <div className="flex items-center gap-1.5 shrink-0">
-                                                    <Eye className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
-                                                    <a href={msg.fileUrl} download={msg.fileName} onClick={e => e.stopPropagation()} className="p-1 hover:bg-white/10 rounded-md transition-colors">
-                                                        <Download className="w-4 h-4 opacity-50 hover:opacity-100" />
-                                                    </a>
-                                                </div>
                                             </div>
                                         ) : (
-                                            <div className="relative group/content">
+                                            <div className="relative">
                                                 {editingId === msg.id ? (
                                                     <div className="flex flex-col gap-2 min-w-[200px]">
                                                         <textarea 
@@ -468,26 +509,10 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <>
-                                                        <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap pr-8">
-                                                            {msg.message}
-                                                            {msg.isEdited && <span className="text-[10px] opacity-50 ml-1.5 italic">(edited)</span>}
-                                                        </p>
-                                                        <div className="absolute top-0 right-0 flex items-center gap-1 opacity-0 group-hover/content:opacity-100 transition-opacity">
-                                                            {isMe && (new Date() - new Date(msg.timestamp)) < 300000 && (
-                                                                <button onClick={() => handleEdit(msg)} className="p-1 hover:bg-white/10 rounded" title="Edit message">
-                                                                    <Pencil className="w-3.5 h-3.5 opacity-70" />
-                                                                </button>
-                                                            )}
-                                                            <button 
-                                                                onClick={() => handleCopy(msg.message, i)}
-                                                                className={`p-1 rounded ${isMe ? 'bg-black/20 hover:bg-black/40' : 'bg-[var(--bg-main)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-                                                                title="Copy message"
-                                                            >
-                                                                {copiedId === i ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                                            </button>
-                                                        </div>
-                                                    </>
+                                                    <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">
+                                                        {msg.message}
+                                                        {msg.isEdited && <span className="text-[10px] opacity-50 ml-1.5 italic">(edited)</span>}
+                                                    </p>
                                                 )}
                                             </div>
                                         )}
@@ -519,57 +544,62 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                     <div ref={scrollRef} />
                 </div>
 
-                {/* Status Items */}
-                <div className="px-5 space-y-2 shrink-0">
-                    {typingLabel && <div className="text-xs font-medium text-[var(--text-secondary)] italic">{typingLabel}...</div>}
-                    {isUploading && (
-                        <div className="flex items-center gap-2 text-xs font-medium text-[var(--primary-accent)] bg-[var(--primary-accent)]/10 px-3 py-1.5 rounded-lg w-fit">
-                            <span className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin border-[var(--primary-accent)]" /> Uploading...
-                        </div>
-                    )}
-                    {!isConnected && (
-                        <div className="flex items-center gap-2 text-xs font-medium text-[var(--danger)] bg-[var(--danger)]/10 px-3 py-1.5 rounded-lg w-fit">
-                            <WifiOff className="w-3 h-3" /> Reconnecting...
-                        </div>
-                    )}
-                </div>
-
                 {/* Input Area */}
-                <div className="p-4 pt-2 bg-gradient-to-t from-[var(--bg-main)] to-transparent shrink-0">
-                    <form onSubmit={sendMessage} className="max-w-4xl mx-auto flex items-center gap-2 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl px-2 py-1.5 focus-within:border-[var(--primary-accent)] focus-within:ring-1 focus-within:ring-[var(--primary-accent)] transition-all">
+                <div className="px-4 pb-4 pt-0 bg-gradient-to-t from-[var(--bg-main)] to-transparent shrink-0">
+                    <div className="max-w-4xl mx-auto relative">
+                        {/* Compact Status Chips */}
+                        <div className="absolute -top-10 left-0 right-0 flex items-center gap-2 pointer-events-none">
+                            {typingLabel && (
+                                <div className="text-[10px] font-bold text-[var(--text-secondary)] bg-[var(--bg-surface)]/80 backdrop-blur-md border border-[var(--border-color)] px-2.5 py-1 rounded-full animate-pulse uppercase tracking-wider">
+                                    {typingLabel}
+                                </div>
+                            )}
+                            {isUploading && (
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-[var(--primary-accent)] bg-[var(--primary-accent)]/10 backdrop-blur-md border border-[var(--primary-accent)]/20 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                                    <span className="w-2 h-2 rounded-full border border-t-transparent animate-spin border-[var(--primary-accent)]" /> Uploading
+                                </div>
+                            )}
+                            {!isConnected && (
+                                <div className="flex items-center gap-2 text-[10px] font-bold text-[var(--danger)] bg-[var(--danger)]/10 backdrop-blur-md border border-[var(--danger)]/20 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                                    <WifiOff className="w-2.5 h-2.5" /> Offline
+                                </div>
+                            )}
+                        </div>
 
-                        <input
-                            type="file"
-                            hidden
-                            ref={fileInputRef}
-                            onChange={handleFileUpload}
-                            accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.docx,.doc,.txt,.py,.ipynb,.csv,.r,.json,.xlsx,.xls,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => fileInputRef.current.click()}
-                            disabled={!isConnected || isShredded}
-                            className={`p-2 rounded-lg text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-all active:scale-95 shrink-0 ${isUploading ? 'animate-pulse' : ''}`}
-                            title="Attach file"
-                        >
-                            <Paperclip className="w-5 h-5" />
-                        </button>
-                        
-                        <textarea
-                            value={input}
-                            onChange={handleInputChange}
-                            onPaste={handlePaste}
-                            disabled={!isConnected || isShredded}
-                            placeholder={isShredded ? "Session ended" : "Type a message..."}
-                            className="flex-1 max-h-32 min-h-[36px] bg-transparent border-none text-[14px] font-mono text-white resize-none outline-none py-2 px-2 leading-relaxed"
-                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e); } }}
-                        />
+                        <form onSubmit={sendMessage} className="flex items-center gap-1 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl px-1 py-0.5 focus-within:border-[var(--primary-accent)] transition-all shadow-lg">
+                            <input
+                                type="file"
+                                hidden
+                                ref={fileInputRef}
+                                onChange={handleFileUpload}
+                                accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.docx,.doc,.txt,.py,.ipynb,.csv,.r,.json,.xlsx,.xls,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current.click()}
+                                disabled={!isConnected || isShredded}
+                                className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-all shrink-0"
+                                title="Attach"
+                            >
+                                <Paperclip className="w-4 h-4" />
+                            </button>
+                            
+                            <textarea
+                                value={input}
+                                onChange={handleInputChange}
+                                onPaste={handlePaste}
+                                disabled={!isConnected || isShredded}
+                                placeholder={isShredded ? "Session ended" : "Whisper something..."}
+                                className="flex-1 max-h-32 min-h-[30px] bg-transparent border-none text-[13px] text-white resize-none outline-none py-1.5 px-1 leading-normal"
+                                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e); } }}
+                            />
 
-                        <button type="submit" disabled={!isConnected || isShredded || !input.trim()}
-                            className="p-2 rounded-lg bg-[var(--primary-accent)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-30 disabled:grayscale transition-all shrink-0">
-                            <Send className="w-5 h-5" />
-                        </button>
-                    </form>
+                            <button type="submit" disabled={!isConnected || isShredded || !input.trim()}
+                                className="p-1.5 rounded-lg bg-[var(--primary-accent)] text-white hover:scale-105 active:scale-95 disabled:opacity-30 disabled:grayscale transition-all shrink-0">
+                                <Send className="w-4 h-4" />
+                            </button>
+                        </form>
+                    </div>
                 </div>
 
             </main>
