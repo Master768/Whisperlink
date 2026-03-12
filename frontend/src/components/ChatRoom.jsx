@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
-import { Send, FileUp, Download, Shield, Hash, Users, X, Paperclip, WifiOff, LogOut, AlertTriangle, Lock, Clock, Copy, Check } from 'lucide-react';
+import { Send, FileUp, Download, Shield, Hash, Users, X, Paperclip, WifiOff, LogOut, AlertTriangle, Lock, Clock, Copy, Check, Eye } from 'lucide-react';
+import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 
 const USER_COLORS = [
     '#2f81f7', '#3fb950', '#a371f7', '#f85149', '#d29922',
@@ -15,7 +17,7 @@ function getUserColor(username) {
 
 function getFileLabel(filename) {
     const ext = filename.split('.').pop().toLowerCase();
-    return { py: 'Python', ipynb: 'Notebook', txt: 'Text', docx: 'Word', doc: 'Word', pdf: 'PDF', zip: 'Archive', csv: 'CSV', r: 'R File', json: 'JSON' }[ext] || 'File';
+    return { py: 'Python', ipynb: 'Notebook', txt: 'Text', docx: 'Word', doc: 'Word', pdf: 'PDF', zip: 'Archive', csv: 'CSV', r: 'R File', json: 'JSON', xlsx: 'Excel', xls: 'Excel' }[ext] || 'File';
 }
 
 const TYPING_TIMEOUT = 2500;
@@ -43,6 +45,9 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
     const [typingUsers, setTypingUsers] = useState([]);
     const [copiedId, setCopiedId] = useState(null);
+    const [previewFile, setPreviewFile] = useState(null); // { name, url, type }
+    const [previewData, setPreviewData] = useState(null); // For csv/xlsx/code text
+    const [isPreviewLoading, setIsPreviewLoading] = useState(false);
     const scrollRef = useRef();
     const socketRef = useRef();
     const fileInputRef = useRef();
@@ -119,6 +124,43 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
             if (res.ok) socketRef.current.emit('send_message', { roomId, type: 'file', fileName: data.fileName, fileUrl: data.fileUrl });
         } catch (err) { console.error(err); }
         finally { setIsUploading(false); setUploadFileName(''); if (fileInputRef.current) fileInputRef.current.value = ''; }
+    };
+
+    const handleFilePreview = async (fileName, fileUrl) => {
+        const ext = fileName.split('.').pop().toLowerCase();
+        setPreviewFile({ name: fileName, url: fileUrl, ext });
+        setPreviewData(null);
+        setIsPreviewLoading(true);
+
+        const isTable = ['csv', 'xlsx', 'xls'].includes(ext);
+        const isCode = ['py', 'ipynb', 'r', 'json', 'txt', 'js', 'jsx', 'html', 'css'].includes(ext);
+
+        if (isTable || isCode) {
+            try {
+                const res = await fetch(fileUrl);
+                if (ext === 'csv') {
+                    const text = await res.text();
+                    Papa.parse(text, {
+                        complete: (results) => setPreviewData({ type: 'table', data: results.data }),
+                        header: false
+                    });
+                } else if (ext === 'xlsx' || ext === 'xls') {
+                    const buffer = await res.arrayBuffer();
+                    const wb = XLSX.read(buffer, { type: 'array' });
+                    const wsname = wb.SheetNames[0];
+                    const ws = wb.Sheets[wsname];
+                    const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                    setPreviewData({ type: 'table', data });
+                } else if (isCode) {
+                    const text = await res.text();
+                    setPreviewData({ type: 'code', data: text });
+                }
+            } catch (err) {
+                console.error('Preview error:', err);
+                setPreviewData({ type: 'error', data: 'Failed to load preview' });
+            }
+        }
+        setIsPreviewLoading(false);
     };
 
     const handlePaste = (e) => {
@@ -327,7 +369,7 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                                         style={{ borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px' }}>
 
                                         {msg.type === 'file' ? (
-                                            <a href={msg.fileUrl} download={msg.fileName} target="_blank" rel="noreferrer" className="flex items-center gap-3 group max-w-full overflow-hidden">
+                                            <div onClick={() => handleFilePreview(msg.fileName, msg.fileUrl)} className="flex items-center gap-3 group max-w-full overflow-hidden cursor-pointer">
                                                 <div className={`p-2 shrink-0 rounded-lg ${isMe ? 'bg-black/20' : 'bg-[var(--bg-main)] border border-[var(--border-color)]'}`}>
                                                     <Paperclip className="w-5 h-5" />
                                                 </div>
@@ -335,8 +377,13 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                                                     <p className="text-sm font-semibold truncate">{msg.fileName}</p>
                                                     <p className="text-xs opacity-70">{getFileLabel(msg.fileName)}</p>
                                                 </div>
-                                                <Download className="w-4 h-4 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" />
-                                            </a>
+                                                <div className="flex gap-2">
+                                                    <Eye className="w-4 h-4 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" />
+                                                    <a href={msg.fileUrl} download={msg.fileName} onClick={e => e.stopPropagation()} className="p-0.5">
+                                                        <Download className="w-4 h-4 shrink-0 opacity-50 hover:opacity-100 transition-opacity" />
+                                                    </a>
+                                                </div>
+                                            </div>
                                         ) : (
                                             <div className="relative">
                                                 <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap pr-6">{msg.message}</p>
@@ -402,6 +449,106 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                 </div>
 
             </main>
+
+            {/* PREVIEW MODAL */}
+            {previewFile && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+                    onClick={() => setPreviewFile(null)}>
+                    <div className="w-full max-w-5xl max-h-[90vh] bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl flex flex-col overflow-hidden fade-in shadow-2xl"
+                        onClick={e => e.stopPropagation()}>
+                        
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)] bg-[var(--bg-surface)]">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="p-2 rounded-lg bg-[var(--primary-accent)]/10 text-[var(--primary-accent)] shrink-0">
+                                    <Paperclip className="w-5 h-5" />
+                                </div>
+                                <div className="min-w-0">
+                                    <h3 className="text-sm font-semibold text-white truncate">{previewFile.name}</h3>
+                                    <p className="text-xs text-[var(--text-secondary)]">{getFileLabel(previewFile.name)}</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <a href={previewFile.url} download={previewFile.name} className="btn-secondary p-2 rounded-lg flex items-center gap-2 text-xs">
+                                    <Download className="w-4 h-4" /> Download
+                                </a>
+                                <button onClick={() => setPreviewFile(null)} className="p-2 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-secondary)] transition-colors">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="flex-1 overflow-auto p-4 bg-[var(--bg-main)]">
+                            {isPreviewLoading ? (
+                                <div className="h-full flex items-center justify-center">
+                                    <div className="w-10 h-10 border-4 border-[var(--primary-accent)] border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            ) : (
+                                <div className="h-full">
+                                    {/* Image Preview */}
+                                    {['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(previewFile.ext) && (
+                                        <div className="h-full flex items-center justify-center">
+                                            <img src={previewFile.url} alt={previewFile.name} className="max-w-full max-h-full object-contain rounded-lg" />
+                                        </div>
+                                    )}
+
+                                    {/* PDF Preview */}
+                                    {previewFile.ext === 'pdf' && (
+                                        <iframe src={previewFile.url} className="w-full h-full rounded-lg bg-white" title="PDF Preview" />
+                                    )}
+
+                                    {/* Table Preview (CSV/XLSX) */}
+                                    {previewData?.type === 'table' && (
+                                        <div className="overflow-auto border border-[var(--border-color)] rounded-lg">
+                                            <table className="w-full border-collapse text-sm text-left">
+                                                <tbody className="divide-y divide-[var(--border-color)]">
+                                                    {previewData.data.map((row, i) => (
+                                                        <tr key={i} className={i === 0 ? "bg-[var(--bg-surface)] font-semibold text-white sticky top-0" : "hover:bg-[var(--bg-surface)] text-[var(--text-secondary)]"}>
+                                                            {row.map((cell, j) => (
+                                                                <td key={j} className="px-4 py-3 border-r border-[var(--border-color)] whitespace-nowrap">{cell}</td>
+                                                            ))}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
+                                    {/* Code Preview */}
+                                    {previewData?.type === 'code' && (
+                                        <div className="h-full bg-[var(--bg-surface)] rounded-lg border border-[var(--border-color)] overflow-hidden flex flex-col">
+                                            <div className="px-4 py-2 bg-black/20 border-b border-[var(--border-color)] flex items-center justify-between">
+                                                <span className="text-[10px] font-mono text-[var(--text-secondary)] uppercase tracking-widest">{previewFile.ext} Viewer</span>
+                                                <button onClick={() => handleCopy(previewData.data, -1)} className="p-1 hover:bg-white/10 rounded transition-colors text-[var(--text-secondary)]">
+                                                    {copiedId === -1 ? <Check className="w-3 h-3 text-[var(--success)]" /> : <Copy className="w-3 h-3" />}
+                                                </button>
+                                            </div>
+                                            <pre className="flex-1 p-6 overflow-auto font-mono text-sm text-[var(--text-primary)] leading-relaxed whitespace-pre select-text">
+                                                {previewData.data}
+                                            </pre>
+                                        </div>
+                                    )}
+
+                                    {/* Unsupported/Fallback */}
+                                    {!['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'].includes(previewFile.ext) && !previewData && (
+                                        <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
+                                            <div className="p-4 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)]">
+                                                <Paperclip className="w-8 h-8 text-[var(--text-secondary)]" />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-lg font-medium text-white">Preview unavailable</h3>
+                                                <p className="text-sm text-[var(--text-secondary)] mt-1">Downloading might be required for this file type.</p>
+                                                <a href={previewFile.url} download={previewFile.name} className="btn-primary mt-6 inline-flex px-6 py-2.5 rounded-xl">Download File</a>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

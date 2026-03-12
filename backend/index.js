@@ -67,10 +67,12 @@ const upload = multer({
             'text/plain',
             'text/x-python', 'application/x-python-code',
             'application/octet-stream', // covers .ipynb and unknown types
-            'application/json'
+            'application/json',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
+            'application/vnd.ms-excel' // xls
         ];
         const isAllowed = allowed.some(type => file.mimetype.startsWith(type) || file.mimetype === type);
-        const allowedExtensions = /\.(jpg|jpeg|png|gif|webp|mp4|mov|mp3|wav|pdf|docx|doc|txt|py|ipynb|zip|csv|r|json)$/i;
+        const allowedExtensions = /\.(jpg|jpeg|png|gif|webp|mp4|mov|mp3|wav|pdf|docx|doc|txt|py|ipynb|zip|csv|r|json|xlsx|xls)$/i;
         const extOk = allowedExtensions.test(file.originalname);
         if (isAllowed || extOk) {
             cb(null, true);
