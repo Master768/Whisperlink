@@ -66,9 +66,10 @@ const upload = multer({
             'text/plain',
             'text/x-python', 'application/x-python-code',
             'application/octet-stream', // covers .ipynb and unknown types
+            'application/json'
         ];
         const isAllowed = allowed.some(type => file.mimetype.startsWith(type) || file.mimetype === type);
-        const allowedExtensions = /\.(jpg|jpeg|png|gif|webp|mp4|mov|mp3|wav|pdf|docx|doc|txt|py|ipynb|zip|csv)$/i;
+        const allowedExtensions = /\.(jpg|jpeg|png|gif|webp|mp4|mov|mp3|wav|pdf|docx|doc|txt|py|ipynb|zip|csv|r|json)$/i;
         const extOk = allowedExtensions.test(file.originalname);
         if (isAllowed || extOk) {
             cb(null, true);
@@ -131,10 +132,32 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
 
     res.status(200).json({
         message: 'File uploaded successfully',
-        fileUrl: `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`,
+        fileUrl: `${req.protocol}://${req.get('host')}/api/download/${req.file.filename}`,
         fileName: req.file.originalname,
         fileSize: req.file.size
     });
+});
+
+// File Download
+app.get('/api/download/:filename', (req, res) => {
+    const filePath = path.join(__dirname, 'uploads', req.params.filename);
+    if (fs.existsSync(filePath)) {
+        // Filename format from multer: Date-Random-originalname
+        // So we can extract the originalName to set it as the download name
+        const parts = req.params.filename.split('-');
+        const originalName = parts.length > 2 ? parts.slice(2).join('-') : req.params.filename;
+        
+        res.download(filePath, originalName, (err) => {
+            if (err) {
+                console.error('Error downloading file:', err);
+                if (!res.headersSent) {
+                    res.status(500).json({ error: 'Error downloading file' });
+                }
+            }
+        });
+    } else {
+        res.status(404).json({ error: 'File not found' });
+    }
 });
 
 // Socket.io Logic

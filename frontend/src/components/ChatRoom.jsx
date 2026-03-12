@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
-import { Send, FileUp, Download, Shield, Hash, Users, X, Paperclip, WifiOff, LogOut, AlertTriangle, Lock, Clock } from 'lucide-react';
+import { Send, FileUp, Download, Shield, Hash, Users, X, Paperclip, WifiOff, LogOut, AlertTriangle, Lock, Clock, Copy, Check } from 'lucide-react';
 
 const USER_COLORS = [
     '#2f81f7', '#3fb950', '#a371f7', '#f85149', '#d29922',
@@ -15,7 +15,7 @@ function getUserColor(username) {
 
 function getFileLabel(filename) {
     const ext = filename.split('.').pop().toLowerCase();
-    return { py: 'Python', ipynb: 'Notebook', txt: 'Text', docx: 'Word', doc: 'Word', pdf: 'PDF', zip: 'Archive', csv: 'CSV' }[ext] || 'File';
+    return { py: 'Python', ipynb: 'Notebook', txt: 'Text', docx: 'Word', doc: 'Word', pdf: 'PDF', zip: 'Archive', csv: 'CSV', r: 'R File', json: 'JSON' }[ext] || 'File';
 }
 
 const TYPING_TIMEOUT = 2500;
@@ -42,6 +42,7 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
     const [isShredded, setIsShredded] = useState(false);
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
     const [typingUsers, setTypingUsers] = useState([]);
+    const [copiedId, setCopiedId] = useState(null);
     const scrollRef = useRef();
     const socketRef = useRef();
     const fileInputRef = useRef();
@@ -106,7 +107,7 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
     };
 
     const handleFileUpload = async e => {
-        const file = e.target.files[0];
+        const file = e?.target?.files ? e.target.files[0] : e;
         if (!file || !isConnected || isShredded) return;
         if (file.size > 25 * 1024 * 1024) { alert('File too large (Max 25MB)'); return; }
         setIsUploading(true); setUploadFileName(file.name);
@@ -118,6 +119,28 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
             if (res.ok) socketRef.current.emit('send_message', { roomId, type: 'file', fileName: data.fileName, fileUrl: data.fileUrl });
         } catch (err) { console.error(err); }
         finally { setIsUploading(false); setUploadFileName(''); if (fileInputRef.current) fileInputRef.current.value = ''; }
+    };
+
+    const handlePaste = (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image/') !== -1) {
+                const blob = items[i].getAsFile();
+                if (blob) {
+                    e.preventDefault();
+                    const file = new File([blob], 'pasted-image.png', { type: blob.type });
+                    handleFileUpload(file);
+                    break;
+                }
+            }
+        }
+    };
+
+    const handleCopy = (text, idx) => {
+        navigator.clipboard.writeText(text);
+        setCopiedId(idx);
+        setTimeout(() => setCopiedId(null), 2000);
     };
 
     const typingLabel = (() => {
@@ -300,22 +323,31 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                                 <div className={`flex flex-col max-w-[80%] sm:max-w-[65%] gap-1 ${isMe ? 'items-end' : 'items-start'}`}>
                                     {!isMe && <span className="text-xs font-medium ml-1" style={{ color: uc }}>{msg.username}</span>}
 
-                                    <div className={`px-4 py-3 rounded-2xl ${isMe ? 'bg-[var(--primary-accent)] text-white' : 'bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-primary)]'}`}
+                                    <div className={`px-4 py-3 rounded-2xl relative group ${isMe ? 'bg-[var(--primary-accent)] text-white' : 'bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-primary)]'}`}
                                         style={{ borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px' }}>
 
                                         {msg.type === 'file' ? (
-                                            <a href={msg.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 group">
-                                                <div className={`p-2 rounded-lg ${isMe ? 'bg-black/20' : 'bg-[var(--bg-main)] border border-[var(--border-color)]'}`}>
+                                            <a href={msg.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 group max-w-full overflow-hidden">
+                                                <div className={`p-2 shrink-0 rounded-lg ${isMe ? 'bg-black/20' : 'bg-[var(--bg-main)] border border-[var(--border-color)]'}`}>
                                                     <Paperclip className="w-5 h-5" />
                                                 </div>
-                                                <div className="flex-1 min-w-0 pr-2">
+                                                <div className="flex-1 min-w-0 pr-2 overflow-hidden">
                                                     <p className="text-sm font-semibold truncate">{msg.fileName}</p>
                                                     <p className="text-xs opacity-70">{getFileLabel(msg.fileName)}</p>
                                                 </div>
-                                                <Download className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
+                                                <Download className="w-4 h-4 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" />
                                             </a>
                                         ) : (
-                                            <p className="text-[15px] leading-relaxed break-words">{msg.message}</p>
+                                            <div className="relative">
+                                                <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap pr-6">{msg.message}</p>
+                                                <button 
+                                                    onClick={() => handleCopy(msg.message, i)}
+                                                    className={`absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity rounded ${isMe ? 'bg-black/20 hover:bg-black/40' : 'bg-[var(--bg-main)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                                                    title="Copy message"
+                                                >
+                                                    {copiedId === i ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                     <span className="text-[10px] font-medium text-[var(--text-secondary)] px-1">
@@ -355,6 +387,7 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                         <textarea
                             value={input}
                             onChange={handleInputChange}
+                            onPaste={handlePaste}
                             disabled={!isConnected || isShredded}
                             placeholder={isShredded ? "Session ended" : "Type a message..."}
                             className="flex-1 max-h-32 min-h-[44px] bg-transparent border-none text-[15px] text-white resize-none outline-none py-3 px-2"
