@@ -226,15 +226,19 @@ io.on('connection', (socket) => {
 
     socket.on('send_message', async (data) => {
         const { roomId, message, type, fileName, fileUrl } = data;
+        const messageId = Date.now() + Math.random().toString(36).substr(2, 9);
+        const timestamp = new Date();
 
         io.to(roomId).emit('receive_message', {
+            id: messageId,
             sender: socket.id,
             username: socket.username || 'Anonymous',
             message,
             type,
             fileName,
             fileUrl,
-            timestamp: new Date()
+            timestamp,
+            seenBy: [socket.username] // Sender has seen it
         });
 
         // Update room activity
@@ -243,6 +247,20 @@ io.on('connection', (socket) => {
             if (room) await room.updateActivity();
         } catch (err) {
             console.error('Error updating room activity:', err);
+        }
+    });
+
+    socket.on('mark_seen', ({ roomId, messageId, username }) => {
+        io.to(roomId).emit('message_seen', { messageId, username });
+    });
+
+    socket.on('edit_message', ({ roomId, messageId, newMessage, timestamp }) => {
+        const now = new Date();
+        const msgTime = new Date(timestamp);
+        const diffMinutes = (now - msgTime) / 1000 / 60;
+
+        if (diffMinutes <= 5) {
+            io.to(roomId).emit('message_edited', { messageId, newMessage });
         }
     });
 

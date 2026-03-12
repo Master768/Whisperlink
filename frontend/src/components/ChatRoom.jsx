@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
-import { Send, FileUp, Download, Shield, Hash, Users, X, Paperclip, WifiOff, LogOut, AlertTriangle, Lock, Clock, Copy, Check, Eye } from 'lucide-react';
+import { Send, FileUp, Download, Shield, Hash, Users, X, Paperclip, WifiOff, LogOut, AlertTriangle, Lock, Clock, Copy, Check, Eye, Pencil } from 'lucide-react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 
@@ -56,11 +56,14 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
     const [previewFile, setPreviewFile] = useState(null); // { name, url, type }
     const [previewData, setPreviewData] = useState(null); // For csv/xlsx/code text
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+    const [editingId, setEditingId] = useState(null);
+    const [editInput, setEditInput] = useState('');
     const scrollRef = useRef();
     const socketRef = useRef();
     const fileInputRef = useRef();
     const typingTimerRef = useRef(null);
     const isTypingRef = useRef(false);
+    const observerRef = useRef(); // For seen-tracking
 
     useEffect(() => {
         try {
@@ -92,11 +95,37 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
         const sk = socketRef.current;
         sk.on('connect', () => { setIsConnected(true); sk.emit('join_room', { roomId, username }); });
         sk.on('disconnect', () => setIsConnected(false));
-        sk.on('receive_message', msg => setMessages(p => [...p, msg]));
+        sk.on('receive_message', msg => {
+            setMessages(p => {
+                if (p.some(m => m.id === msg.id)) return p;
+                return [...p, msg];
+            });
+        });
+        sk.on('message_seen', ({ messageId, username: u }) => {
+            setMessages(p => p.map(m => m.id === messageId ? { ...m, seenBy: Array.from(new Set([...(m.seenBy || []), u])) } : m));
+        });
+        sk.on('message_edited', ({ messageId, newMessage }) => {
+            setMessages(p => p.map(m => m.id === messageId ? { ...m, message: newMessage, isEdited: true } : m));
+        });
         sk.on('room_data', d => { setUserCount(d.userCount); setMembers(d.users || []); });
         sk.on('user_typing', ({ username: u }) => setTypingUsers(p => p.includes(u) ? p : [...p, u]));
         sk.on('user_stop_typing', ({ username: u }) => setTypingUsers(p => p.filter(x => x !== u)));
         return () => { if (sk) sk.disconnect(); };
+    }, [roomId, username]);
+
+    useEffect(() => {
+        observerRef.current = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const msgId = entry.target.getAttribute('data-id');
+                    const msgSender = entry.target.getAttribute('data-sender');
+                    if (msgId && msgSender !== socketRef.current?.id) {
+                        socketRef.current?.emit('mark_seen', { roomId, messageId: msgId, username });
+                    }
+                }
+            });
+        }, { threshold: 0.5 });
+        return () => observerRef.current?.disconnect();
     }, [roomId, username]);
 
     useEffect(() => {
@@ -173,7 +202,9 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                     setPreviewData({ type: 'table', data });
                 } else if (isCode) {
                     const text = await res.text();
-                    setPreviewData({ type: 'code', data: text });
+                    // Limit to 5,000 characters for performance
+                    const truncated = text.length > 5000 ? text.substring(0, 5000) + '\n\n... (file truncated for preview)' : text;
+                    setPreviewData({ type: 'code', data: truncated });
                 }
             } catch (err) {
                 console.error('Preview error:', err);
@@ -198,6 +229,21 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                 }
             }
         }
+    };
+
+    const handleEdit = (msg) => {
+        setEditingId(msg.id);
+        setEditInput(msg.message);
+    };
+
+    const saveEdit = (messageId, timestamp) => {
+        if (!editInput.trim() || editInput === messages.find(m => m.id === messageId)?.message) {
+            setEditingId(null);
+            return;
+        }
+        socketRef.current.emit('edit_message', { roomId, messageId, newMessage: editInput, timestamp });
+        setEditingId(null);
+        setEditInput('');
     };
 
     const handleCopy = (text, idx) => {
@@ -406,21 +452,66 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="relative">
-                                                <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap pr-6">{msg.message}</p>
-                                                <button 
-                                                    onClick={() => handleCopy(msg.message, i)}
-                                                    className={`absolute top-0 right-0 p-1 opacity-0 group-hover:opacity-100 transition-opacity rounded ${isMe ? 'bg-black/20 hover:bg-black/40' : 'bg-[var(--bg-main)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
-                                                    title="Copy message"
-                                                >
-                                                    {copiedId === i ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                                                </button>
+                                            <div className="relative group/content">
+                                                {editingId === msg.id ? (
+                                                    <div className="flex flex-col gap-2 min-w-[200px]">
+                                                        <textarea 
+                                                            value={editInput}
+                                                            onChange={e => setEditInput(e.target.value)}
+                                                            className="w-full bg-black/20 border border-white/20 rounded-lg p-2 text-sm text-white focus:outline-none resize-none"
+                                                            rows={2}
+                                                            autoFocus
+                                                        />
+                                                        <div className="flex justify-end gap-2">
+                                                            <button onClick={() => setEditingId(null)} className="text-[10px] uppercase font-bold opacity-70 hover:opacity-100">Cancel</button>
+                                                            <button onClick={() => saveEdit(msg.id, msg.timestamp)} className="text-[10px] uppercase font-bold text-white hover:underline">Save</button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap pr-8">
+                                                            {msg.message}
+                                                            {msg.isEdited && <span className="text-[10px] opacity-50 ml-1.5 italic">(edited)</span>}
+                                                        </p>
+                                                        <div className="absolute top-0 right-0 flex items-center gap-1 opacity-0 group-hover/content:opacity-100 transition-opacity">
+                                                            {isMe && (new Date() - new Date(msg.timestamp)) < 300000 && (
+                                                                <button onClick={() => handleEdit(msg)} className="p-1 hover:bg-white/10 rounded" title="Edit message">
+                                                                    <Pencil className="w-3.5 h-3.5 opacity-70" />
+                                                                </button>
+                                                            )}
+                                                            <button 
+                                                                onClick={() => handleCopy(msg.message, i)}
+                                                                className={`p-1 rounded ${isMe ? 'bg-black/20 hover:bg-black/40' : 'bg-[var(--bg-main)] hover:bg-[var(--bg-surface-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                                                                title="Copy message"
+                                                            >
+                                                                {copiedId === i ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
                                             </div>
                                         )}
                                     </div>
-                                    <span className="text-[10px] font-medium text-[var(--text-secondary)] px-1">
-                                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
+                                    <div className={`flex items-center gap-2 px-1 ${isMe ? 'flex-row-reverse' : ''}`}>
+                                        <span className="text-[10px] font-medium text-[var(--text-secondary)]"
+                                            ref={el => { if (el) observerRef.current?.observe(el); }}
+                                            data-id={msg.id}
+                                            data-sender={msg.sender}
+                                        >
+                                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                        {isMe && msg.seenBy && msg.seenBy.length > 1 && (
+                                            <div className="group relative flex items-center gap-1 cursor-help" title={`Seen by: ${msg.seenBy.filter(u => u !== username).join(', ')}`}>
+                                                <div className="flex -space-x-1.5">
+                                                    <Check className="w-3 h-3 text-[var(--primary-accent)]" />
+                                                    <Check className="w-3 h-3 text-[var(--primary-accent)] -ml-2" />
+                                                </div>
+                                                <span className="text-[9px] text-[var(--primary-accent)] font-bold">
+                                                    {msg.seenBy.length - 1}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         );
@@ -445,14 +536,14 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
 
                 {/* Input Area */}
                 <div className="p-4 pt-2 bg-gradient-to-t from-[var(--bg-main)] to-transparent shrink-0">
-                    <form onSubmit={sendMessage} className="flex items-center gap-2 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl px-2 py-1.5 focus-within:border-[var(--primary-accent)] focus-within:ring-1 focus-within:ring-[var(--primary-accent)] transition-all">
+                    <form onSubmit={sendMessage} className="max-w-4xl mx-auto flex items-center gap-2 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl px-2 py-1.5 focus-within:border-[var(--primary-accent)] focus-within:ring-1 focus-within:ring-[var(--primary-accent)] transition-all">
 
                         <input
                             type="file"
                             hidden
                             ref={fileInputRef}
                             onChange={handleFileUpload}
-                            accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.docx,.doc,.txt,.py,.ipynb,.csv,.r,.json,.xlsx,.xls"
+                            accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.docx,.doc,.txt,.py,.ipynb,.csv,.r,.json,.xlsx,.xls,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         />
                         <button
                             type="button"
@@ -532,7 +623,9 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
 
                                     {/* PDF Preview */}
                                     {previewFile.ext === 'pdf' && (
-                                        <iframe src={previewFile.url} className="w-full h-full rounded-lg bg-white" title="PDF Preview" />
+                                        <div className="w-full h-[80vh] rounded-lg bg-white overflow-hidden shadow-inner">
+                                            <iframe src={previewFile.url} className="w-full h-full border-none" title="PDF Preview" />
+                                        </div>
                                     )}
 
                                     {/* Table Preview (CSV/XLSX) */}
