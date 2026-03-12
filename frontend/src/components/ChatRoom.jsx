@@ -327,7 +327,7 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                                         style={{ borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px' }}>
 
                                         {msg.type === 'file' ? (
-                                            <a href={msg.fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 group max-w-full overflow-hidden">
+                                            <a href={msg.fileUrl} download={msg.fileName} target="_blank" rel="noreferrer" className="flex items-center gap-3 group max-w-full overflow-hidden">
                                                 <div className={`p-2 shrink-0 rounded-lg ${isMe ? 'bg-black/20' : 'bg-[var(--bg-main)] border border-[var(--border-color)]'}`}>
                                                     <Paperclip className="w-5 h-5" />
                                                 </div>
@@ -390,7 +390,7 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                             onPaste={handlePaste}
                             disabled={!isConnected || isShredded}
                             placeholder={isShredded ? "Session ended" : "Type a message..."}
-                            className="flex-1 max-h-32 min-h-[44px] bg-transparent border-none text-[15px] text-white resize-none outline-none py-3 px-2"
+                            className="flex-1 max-h-32 min-h-[44px] bg-transparent border-none text-[15px] font-mono text-white resize-none outline-none py-3 px-2"
                             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e); } }}
                         />
 
