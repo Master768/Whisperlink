@@ -142,7 +142,9 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
 
     const handleFilePreview = async (fileName, fileUrl) => {
         const ext = fileName.split('.').pop().toLowerCase();
-        setPreviewFile({ name: fileName, url: fileUrl, ext });
+        // Use /api/view instead of /api/download for inline viewing
+        const viewUrl = fileUrl.replace('/api/download/', '/api/view/');
+        setPreviewFile({ name: fileName, url: viewUrl, ext });
         setPreviewData(null);
 
         const isTable = ['csv', 'xlsx', 'xls'].includes(ext);
@@ -155,7 +157,11 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                 if (ext === 'csv') {
                     const text = await res.text();
                     Papa.parse(text, {
-                        complete: (results) => setPreviewData({ type: 'table', data: results.data }),
+                        complete: (results) => {
+                            // Limit to 500 rows for performance
+                            const data = results.data.slice(0, 500);
+                            setPreviewData({ type: 'table', data });
+                        },
                         header: false
                     });
                 } else if (ext === 'xlsx' || ext === 'xls') {
@@ -163,7 +169,7 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                     const wb = XLSX.read(buffer, { type: 'array' });
                     const wsname = wb.SheetNames[0];
                     const ws = wb.Sheets[wsname];
-                    const data = XLSX.utils.sheet_to_json(ws, { header: 1 });
+                    const data = XLSX.utils.sheet_to_json(ws, { header: 1 }).slice(0, 500);
                     setPreviewData({ type: 'table', data });
                 } else if (isCode) {
                     const text = await res.text();
@@ -438,26 +444,38 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                 </div>
 
                 {/* Input Area */}
-                <div className="p-5 pt-3 bg-gradient-to-t from-[var(--bg-main)] to-transparent shrink-0">
-                    <form onSubmit={sendMessage} className="flex items-end gap-2 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl p-2 focus-within:border-[var(--primary-accent)] focus-within:ring-1 focus-within:ring-[var(--primary-accent)] transition-all">
+                <div className="p-4 pt-2 bg-gradient-to-t from-[var(--bg-main)] to-transparent shrink-0">
+                    <form onSubmit={sendMessage} className="flex items-center gap-2 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl px-2 py-1.5 focus-within:border-[var(--primary-accent)] focus-within:ring-1 focus-within:ring-[var(--primary-accent)] transition-all">
 
-                        <label className={`p-2.5 rounded-lg cursor-pointer text-[var(--text-secondary)] hover:text-white hover:bg-[var(--bg-main)] transition-colors ${isUploading || !isConnected || isShredded ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                            <FileUp className="w-5 h-5" />
-                            <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} disabled={isUploading || !isConnected || isShredded} />
-                        </label>
-
+                        <input
+                            type="file"
+                            hidden
+                            ref={fileInputRef}
+                            onChange={handleFileUpload}
+                            accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.docx,.doc,.txt,.py,.ipynb,.csv,.r,.json,.xlsx,.xls"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current.click()}
+                            disabled={!isConnected || isShredded}
+                            className={`p-2 rounded-lg text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-all active:scale-95 shrink-0 ${isUploading ? 'animate-pulse' : ''}`}
+                            title="Attach file"
+                        >
+                            <Paperclip className="w-5 h-5" />
+                        </button>
+                        
                         <textarea
                             value={input}
                             onChange={handleInputChange}
                             onPaste={handlePaste}
                             disabled={!isConnected || isShredded}
                             placeholder={isShredded ? "Session ended" : "Type a message..."}
-                            className="flex-1 max-h-32 min-h-[48px] bg-transparent border-none text-[15px] font-mono text-white resize-none outline-none py-3.5 px-3 leading-normal"
+                            className="flex-1 max-h-32 min-h-[36px] bg-transparent border-none text-[14px] font-mono text-white resize-none outline-none py-2 px-2 leading-relaxed"
                             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e); } }}
                         />
 
                         <button type="submit" disabled={!isConnected || isShredded || !input.trim()}
-                            className="p-2.5 rounded-lg bg-[var(--primary-accent)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-50 disabled:bg-[var(--border-color)] transition-colors mb-0.5 mr-0.5">
+                            className="p-2 rounded-lg bg-[var(--primary-accent)] text-white hover:bg-[var(--primary-hover)] disabled:opacity-30 disabled:grayscale transition-all shrink-0">
                             <Send className="w-5 h-5" />
                         </button>
                     </form>

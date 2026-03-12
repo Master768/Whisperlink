@@ -145,19 +145,24 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
 app.get('/api/download/:filename', (req, res) => {
     const filePath = path.join(__dirname, 'uploads', req.params.filename);
     if (fs.existsSync(filePath)) {
-        // Filename format from multer: Date-Random-originalname
-        // So we can extract the originalName to set it as the download name
         const parts = req.params.filename.split('-');
         const originalName = parts.length > 2 ? parts.slice(2).join('-') : req.params.filename;
-        
         res.download(filePath, originalName, (err) => {
-            if (err) {
+            if (err && !res.headersSent) {
                 console.error('Error downloading file:', err);
-                if (!res.headersSent) {
-                    res.status(500).json({ error: 'Error downloading file' });
-                }
+                res.status(500).json({ error: 'Error downloading file' });
             }
         });
+    } else {
+        res.status(404).json({ error: 'File not found' });
+    }
+});
+
+// File View (Inline delivery for PDF/Images)
+app.get('/api/view/:filename', (req, res) => {
+    const filePath = path.join(__dirname, 'uploads', req.params.filename);
+    if (fs.existsSync(filePath)) {
+        res.sendFile(filePath);
     } else {
         res.status(404).json({ error: 'File not found' });
     }

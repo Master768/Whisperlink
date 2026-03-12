@@ -39,7 +39,10 @@ const JoinRoom = ({ onJoin }) => {
             });
             const data = await res.json();
             if (res.ok) { onJoin(data.roomId, secretPhrase, username.trim(), data.createdAt); }
-            else { setError(data.error || 'Access Denied'); }
+            else { 
+                const msg = data.error || 'Access Denied';
+                setError(msg.includes('phrase') ? 'Incorrect Cipher Key' : 'Room not found or Shredded'); 
+            }
         } catch { setError('Server unreachable. Check your connection.'); }
         finally { setIsLoading(false); }
     };
