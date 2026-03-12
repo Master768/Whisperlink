@@ -15,6 +15,14 @@ function getUserColor(username) {
     return USER_COLORS[Math.abs(hash) % USER_COLORS.length];
 }
 
+function truncateFileName(name, limit = 20) {
+    if (name.length <= limit) return name;
+    const parts = name.split('.');
+    const ext = parts.pop();
+    const base = parts.join('.');
+    return base.substring(0, limit - ext.length - 3) + '...' + ext;
+}
+
 function getFileLabel(filename) {
     const ext = filename.split('.').pop().toLowerCase();
     return { py: 'Python', ipynb: 'Notebook', txt: 'Text', docx: 'Word', doc: 'Word', pdf: 'PDF', zip: 'Archive', csv: 'CSV', r: 'R File', json: 'JSON', xlsx: 'Excel', xls: 'Excel' }[ext] || 'File';
@@ -91,6 +99,12 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
         return () => { if (sk) sk.disconnect(); };
     }, [roomId, username]);
 
+    useEffect(() => {
+        const handleEsc = (e) => { if (e.key === 'Escape') setPreviewFile(null); };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, []);
+
     useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, typingUsers]);
 
     const handleInputChange = e => {
@@ -130,12 +144,12 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
         const ext = fileName.split('.').pop().toLowerCase();
         setPreviewFile({ name: fileName, url: fileUrl, ext });
         setPreviewData(null);
-        setIsPreviewLoading(true);
 
         const isTable = ['csv', 'xlsx', 'xls'].includes(ext);
         const isCode = ['py', 'ipynb', 'r', 'json', 'txt', 'js', 'jsx', 'html', 'css'].includes(ext);
 
         if (isTable || isCode) {
+            setIsPreviewLoading(true);
             try {
                 const res = await fetch(fileUrl);
                 if (ext === 'csv') {
@@ -158,9 +172,10 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
             } catch (err) {
                 console.error('Preview error:', err);
                 setPreviewData({ type: 'error', data: 'Failed to load preview' });
+            } finally {
+                setIsPreviewLoading(false);
             }
         }
-        setIsPreviewLoading(false);
     };
 
     const handlePaste = (e) => {
@@ -369,18 +384,18 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                                         style={{ borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px' }}>
 
                                         {msg.type === 'file' ? (
-                                            <div onClick={() => handleFilePreview(msg.fileName, msg.fileUrl)} className="flex items-center gap-3 group max-w-full overflow-hidden cursor-pointer">
+                                            <div onClick={() => handleFilePreview(msg.fileName, msg.fileUrl)} className="flex items-center gap-3 group max-w-full overflow-hidden cursor-pointer select-none">
                                                 <div className={`p-2 shrink-0 rounded-lg ${isMe ? 'bg-black/20' : 'bg-[var(--bg-main)] border border-[var(--border-color)]'}`}>
                                                     <Paperclip className="w-5 h-5" />
                                                 </div>
-                                                <div className="flex-1 min-w-0 pr-2 overflow-hidden">
-                                                    <p className="text-sm font-semibold truncate">{msg.fileName}</p>
-                                                    <p className="text-xs opacity-70">{getFileLabel(msg.fileName)}</p>
+                                                <div className="flex-1 min-w-0 pr-1 overflow-hidden">
+                                                    <p className="text-sm font-semibold truncate" title={msg.fileName}>{truncateFileName(msg.fileName)}</p>
+                                                    <p className="text-[10px] opacity-70 uppercase tracking-wider">{getFileLabel(msg.fileName)}</p>
                                                 </div>
-                                                <div className="flex gap-2">
-                                                    <Eye className="w-4 h-4 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity" />
-                                                    <a href={msg.fileUrl} download={msg.fileName} onClick={e => e.stopPropagation()} className="p-0.5">
-                                                        <Download className="w-4 h-4 shrink-0 opacity-50 hover:opacity-100 transition-opacity" />
+                                                <div className="flex items-center gap-1.5 shrink-0">
+                                                    <Eye className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-opacity" />
+                                                    <a href={msg.fileUrl} download={msg.fileName} onClick={e => e.stopPropagation()} className="p-1 hover:bg-white/10 rounded-md transition-colors">
+                                                        <Download className="w-4 h-4 opacity-50 hover:opacity-100" />
                                                     </a>
                                                 </div>
                                             </div>
@@ -437,7 +452,7 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                             onPaste={handlePaste}
                             disabled={!isConnected || isShredded}
                             placeholder={isShredded ? "Session ended" : "Type a message..."}
-                            className="flex-1 max-h-32 min-h-[44px] bg-transparent border-none text-[15px] font-mono text-white resize-none outline-none py-3 px-2"
+                            className="flex-1 max-h-32 min-h-[48px] bg-transparent border-none text-[15px] font-mono text-white resize-none outline-none py-3.5 px-3 leading-normal"
                             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e); } }}
                         />
 
@@ -469,10 +484,14 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
-                                <a href={previewFile.url} download={previewFile.name} className="btn-secondary p-2 rounded-lg flex items-center gap-2 text-xs">
-                                    <Download className="w-4 h-4" /> Download
+                                <a href={previewFile.url} download={previewFile.name} className="btn-secondary px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-medium">
+                                    <Download className="w-4 h-4" /> <span className="hidden sm:inline">Download</span>
                                 </a>
-                                <button onClick={() => setPreviewFile(null)} className="p-2 rounded-lg hover:bg-[var(--bg-surface-hover)] text-[var(--text-secondary)] transition-colors">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); setPreviewFile(null); }} 
+                                    className="p-2 rounded-lg hover:bg-white/10 text-[var(--text-secondary)] hover:text-white transition-all active:scale-95"
+                                    aria-label="Close preview"
+                                >
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
