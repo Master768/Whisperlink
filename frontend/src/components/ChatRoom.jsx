@@ -458,29 +458,7 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                                                 )}
                                             </div>
                                         </div>
-                                            {msg.type === 'file' && (
-                                                <>
-                                                    <button onClick={() => handleFilePreview(msg.fileName, msg.fileUrl)} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Preview">
-                                                        <Eye className="w-3.5 h-3.5" />
-                                                    </button>
-                                                    <a href={msg.fileUrl} download={msg.fileName} onClick={e => e.stopPropagation()} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Download">
-                                                        <Download className="w-3.5 h-3.5" />
-                                                    </a>
-                                                </>
-                                            )}
-                                            {msg.type === 'text' && (
-                                                <>
-                                                    {isMe && (new Date() - new Date(msg.timestamp)) < 300000 && !editingId && (
-                                                        <button onClick={() => handleEdit(msg)} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Edit">
-                                                            <Pencil className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    )}
-                                                    <button onClick={() => handleCopy(msg.message, i)} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Copy">
-                                                        {copiedId === i ? <Check className="w-3.5 h-3.5 text-[var(--success)]" /> : <Copy className="w-3.5 h-3.5" />}
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
+
 
                                         {msg.type === 'file' ? (
                                             <div onClick={() => handleFilePreview(msg.fileName, msg.fileUrl)} className="flex items-center gap-3 max-w-full overflow-hidden cursor-pointer select-none">
