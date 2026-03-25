@@ -225,7 +225,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('send_message', async (data) => {
-        const { roomId, message, type, fileName, fileUrl } = data;
+        const { roomId, message, type, fileName, fileUrl, replyTo } = data;
         const messageId = Date.now() + Math.random().toString(36).substr(2, 9);
         const timestamp = new Date();
 
@@ -237,6 +237,7 @@ io.on('connection', (socket) => {
             type,
             fileName,
             fileUrl,
+            replyTo,
             timestamp,
             seenBy: [socket.username] // Sender has seen it
         });

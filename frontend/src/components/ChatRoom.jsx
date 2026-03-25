@@ -1,413 +1,1765 @@
 import React, { useState, useEffect, useRef } from 'react';
+
+
+
 import io from 'socket.io-client';
-import { Send, FileUp, Download, Shield, Hash, Users, X, Paperclip, WifiOff, LogOut, AlertTriangle, Lock, Clock, Copy, Check, Eye, Pencil } from 'lucide-react';
+
+
+
+import { Send, FileUp, Download, Shield, Hash, Users, X, Paperclip, WifiOff, LogOut, AlertTriangle, Lock, Clock, Copy, Check, Eye, Pencil, CornerUpLeft, MoreVertical, ChevronDown } from 'lucide-react';
+
+
+
 import Papa from 'papaparse';
+
+
+
 import * as XLSX from 'xlsx';
 
+
+
+
+
+
+
 const USER_COLORS = [
+
+
+
     '#2f81f7', '#3fb950', '#a371f7', '#f85149', '#d29922',
+
+
+
     '#58a6ff', '#8b949e', '#ff7b72', '#d2a8ff', '#cca700'
+
+
+
 ];
 
+
+
+
+
+
+
 function getUserColor(username) {
+
+
+
     let hash = 0;
+
+
+
     for (let i = 0; i < username.length; i++) hash = username.charCodeAt(i) + ((hash << 5) - hash);
+
+
+
     return USER_COLORS[Math.abs(hash) % USER_COLORS.length];
+
+
+
 }
+
+
+
+
+
+
 
 function truncateFileName(name, limit = 20) {
+
+
+
     if (name.length <= limit) return name;
+
+
+
     const parts = name.split('.');
+
+
+
     const ext = parts.pop();
+
+
+
     const base = parts.join('.');
+
+
+
     return base.substring(0, limit - ext.length - 3) + '...' + ext;
+
+
+
 }
+
+
+
+
+
+
 
 function getFileLabel(filename) {
+
+
+
     const ext = filename.split('.').pop().toLowerCase();
+
+
+
     return { py: 'Python', ipynb: 'Notebook', txt: 'Text', docx: 'Word', doc: 'Word', pdf: 'PDF', zip: 'Archive', csv: 'CSV', r: 'R File', json: 'JSON', xlsx: 'Excel', xls: 'Excel' }[ext] || 'File';
+
+
+
 }
 
+
+
+
+
+
+
 const TYPING_TIMEOUT = 2500;
+
+
+
 const MSG_KEY = r => `wl_messages_${r}`;
+
+
+
 const MSG_EXPIRY_KEY = r => `wl_expiry_${r}`;
 
+
+
+
+
+
+
 const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
+
+
+
     const [messages, setMessages] = useState(() => {
+
+
+
         try {
+
+
+
             const exp = localStorage.getItem(MSG_EXPIRY_KEY(roomId));
+
+
+
             if (exp && Date.now() > Number(exp)) { localStorage.removeItem(MSG_KEY(roomId)); localStorage.removeItem(MSG_EXPIRY_KEY(roomId)); return []; }
+
+
+
             const saved = localStorage.getItem(MSG_KEY(roomId));
-            return saved ? JSON.parse(saved) : [];
+
+
+
+            const p = saved ? JSON.parse(saved) : []; return Array.isArray(p) ? p : [];
+
+
+
         } catch { return []; }
+
+
+
     });
+
+
+
     const [input, setInput] = useState('');
+
+
+
     const [isUploading, setIsUploading] = useState(false);
+
+
+
     const [uploadFileName, setUploadFileName] = useState('');
+
+
+
     const [userCount, setUserCount] = useState(0);
+
+
+
     const [members, setMembers] = useState([]);
+
+
+
     const [isConnected, setIsConnected] = useState(false);
+
+
+
     const [showMembers, setShowMembers] = useState(false);
+
+
+
     const [timeLeft, setTimeLeft] = useState('');
+
+
+
     const [isShredded, setIsShredded] = useState(false);
+
+
+
     const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+
+
+
     const [typingUsers, setTypingUsers] = useState([]);
+
+
+
     const [copiedId, setCopiedId] = useState(null);
+
+
+
     const [previewFile, setPreviewFile] = useState(null); // { name, url, type }
+
+
+
     const [previewData, setPreviewData] = useState(null); // For csv/xlsx/code text
+
+
+
     const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+
+
+
     const [editingId, setEditingId] = useState(null);
+
+
+    const [activeMenuId, setActiveMenuId] = useState(null);
+
+
+
     const [editInput, setEditInput] = useState('');
+
+
+
+    const [replyTo, setReplyTo] = useState(null);
+
+
+    useEffect(() => {
+
+
+        const handleClickOutside = (e) => {
+
+
+            if (!e.target.closest('.message-actions-container')) {
+
+
+                setActiveMenuId(null);
+
+
+            }
+
+
+        };
+
+
+        document.addEventListener('click', handleClickOutside);
+
+
+        return () => document.removeEventListener('click', handleClickOutside);
+
+
+    }, []);
+
+
+
+
+
+ // { id, username, message }
+
+
+
     const scrollRef = useRef();
+
+
+
     const socketRef = useRef();
+
+
+
     const fileInputRef = useRef();
+
+
+
     const typingTimerRef = useRef(null);
+
+
+
     const isTypingRef = useRef(false);
+
+
+
     const observerRef = useRef(); // For seen-tracking
 
+
+
+
+
+
+
     useEffect(() => {
+
+
+
         try {
+
+
+
             localStorage.setItem(MSG_KEY(roomId), JSON.stringify(messages));
+
+
+
             if (createdAt && !localStorage.getItem(MSG_EXPIRY_KEY(roomId))) {
-                localStorage.setItem(MSG_EXPIRY_KEY(roomId), String(new Date(createdAt).getTime() + 45 * 60 * 1000));
+
+
+
+                localStorage.setItem(MSG_EXPIRY_KEY(roomId), String(new Date(createdAt).getTime() + 120 * 60 * 1000));
+
+
+
             }
+
+
+
         } catch { }
+
+
+
     }, [messages, roomId, createdAt]);
 
+
+
+
+
+
+
     useEffect(() => {
+
+
+
         if (!createdAt) return;
-        const shredTime = new Date(createdAt).getTime() + 45 * 60 * 1000;
+
+
+
+        const shredTime = new Date(createdAt).getTime() + 120 * 60 * 1000;
+
+
+
         const updateTimer = () => {
+
+
+
             const diff = shredTime - Date.now();
+
+
+
             if (diff <= 0) { setTimeLeft('00:00'); setIsShredded(true); localStorage.removeItem(MSG_KEY(roomId)); localStorage.removeItem(MSG_EXPIRY_KEY(roomId)); clearInterval(iv); return; }
+
+
+
             const m = Math.floor((diff % (3600000)) / 60000);
+
+
+
             const s = Math.floor((diff % 60000) / 1000);
+
+
+
             setTimeLeft(`${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+
+
+
         };
+
+
+
         updateTimer();
+
+
+
         const iv = setInterval(updateTimer, 1000);
+
+
+
         return () => clearInterval(iv);
+
+
+
     }, [createdAt, roomId]);
 
+
+
+
+
+
+
     useEffect(() => {
+
+
+
         const url = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+
+
+
         socketRef.current = io(url, { transports: ['websocket', 'polling'], reconnectionAttempts: 5 });
+
+
+
         const sk = socketRef.current;
+
+
+
         sk.on('connect', () => { setIsConnected(true); sk.emit('join_room', { roomId, username }); });
+
+
+
         sk.on('disconnect', () => setIsConnected(false));
+
+
+
         sk.on('receive_message', msg => {
+
+
+
             setMessages(p => {
+
+
+
                 if (p.some(m => m.id === msg.id)) return p;
+
+
+
                 return [...p, msg];
+
+
+
             });
+
+
+
         });
+
+
+
         sk.on('message_seen', ({ messageId, username: u }) => {
+
+
+
             setMessages(p => p.map(m => m.id === messageId ? { ...m, seenBy: Array.from(new Set([...(m.seenBy || []), u])) } : m));
+
+
+
         });
+
+
+
         sk.on('message_edited', ({ messageId, newMessage }) => {
+
+
+
             setMessages(p => p.map(m => m.id === messageId ? { ...m, message: newMessage, isEdited: true } : m));
+
+
+
         });
+
+
+
         sk.on('room_data', d => { setUserCount(d.userCount); setMembers(d.users || []); });
+
+
+
         sk.on('user_typing', ({ username: u }) => setTypingUsers(p => p.includes(u) ? p : [...p, u]));
+
+
+
         sk.on('user_stop_typing', ({ username: u }) => setTypingUsers(p => p.filter(x => x !== u)));
+
+
+
         return () => { if (sk) sk.disconnect(); };
+
+
+
     }, [roomId, username]);
 
+
+
+
+
+
+
     useEffect(() => {
+
+
+
         observerRef.current = new IntersectionObserver((entries) => {
+
+
+
             entries.forEach(entry => {
+
+
+
                 if (entry.isIntersecting) {
+
+
+
                     const msgId = entry.target.getAttribute('data-id');
+
+
+
                     const msgSender = entry.target.getAttribute('data-sender');
+
+
+
                     if (msgId && msgSender !== socketRef.current?.id) {
+
+
+
                         socketRef.current?.emit('mark_seen', { roomId, messageId: msgId, username });
+
+
+
                     }
+
+
+
                 }
+
+
+
             });
+
+
+
         }, { threshold: 0.5 });
+
+
+
         return () => observerRef.current?.disconnect();
+
+
+
     }, [roomId, username]);
 
+
+
+
+
+
+
     useEffect(() => {
+
+
+
         const handleEsc = (e) => { if (e.key === 'Escape') setPreviewFile(null); };
+
+
+
         window.addEventListener('keydown', handleEsc);
+
+
+
         return () => window.removeEventListener('keydown', handleEsc);
+
+
+
     }, []);
+
+
+
+
+
+
 
     useEffect(() => { scrollRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, typingUsers]);
 
+
+
+
+
+
+
     const handleInputChange = e => {
+
+
+
         setInput(e.target.value);
+
+
+
         if (!isConnected || isShredded || !socketRef.current) return;
+
+
+
         if (!isTypingRef.current) { isTypingRef.current = true; socketRef.current.emit('typing_start', { roomId }); }
+
+
+
         clearTimeout(typingTimerRef.current);
+
+
+
         typingTimerRef.current = setTimeout(() => { isTypingRef.current = false; socketRef.current.emit('typing_stop', { roomId }); }, TYPING_TIMEOUT);
+
+
+
     };
+
+
+
+
+
+
 
     const sendMessage = e => {
+
+
+
         e?.preventDefault();
+
+
+
         if (!input.trim() || !isConnected || isShredded) return;
+
+
+
         clearTimeout(typingTimerRef.current);
+
+
+
         isTypingRef.current = false;
+
+
+
         socketRef.current.emit('typing_stop', { roomId });
-        socketRef.current.emit('send_message', { roomId, message: input, type: 'text' });
+
+
+
+        socketRef.current.emit('send_message', { 
+
+
+
+            roomId, 
+
+
+
+            message: input, 
+
+
+
+            type: 'text',
+
+
+
+            replyTo: replyTo ? {
+
+
+
+                origId: replyTo.id,
+
+
+
+                origUser: replyTo.username,
+
+
+
+                origText: replyTo.message
+
+
+
+            } : null
+
+
+
+        });
+
+
+
         setInput('');
+
+
+
+        setReplyTo(null);
+
+
+
     };
+
+
+
+
+
+
 
     const handleFileUpload = async e => {
+
+
+
         const file = e?.target?.files ? e.target.files[0] : e;
+
+
+
         if (!file || !isConnected || isShredded) return;
+
+
+
         if (file.size > 25 * 1024 * 1024) { alert('File too large (Max 25MB)'); return; }
+
+
+
         setIsUploading(true); setUploadFileName(file.name);
+
+
+
         const fd = new FormData(); fd.append('file', file);
+
+
+
         try {
+
+
+
             const url = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+
+
+
             const res = await fetch(`${url}/api/upload`, { method: 'POST', body: fd });
+
+
+
             const data = await res.json();
-            if (res.ok) socketRef.current.emit('send_message', { roomId, type: 'file', fileName: data.fileName, fileUrl: data.fileUrl });
+
+
+
+            if (res.ok) {
+
+
+                socketRef.current.emit('send_message', { 
+
+
+                    roomId, 
+
+
+                    type: 'file', 
+
+
+                    fileName: data.fileName, 
+
+
+                    fileUrl: data.fileUrl,
+
+
+                    replyTo: replyTo ? {
+
+
+                        origId: replyTo.id,
+
+
+                        origUser: replyTo.username,
+
+
+                        origText: replyTo.message || (replyTo.type === 'file' ? replyTo.fileName : 'File')
+
+
+                    } : null
+
+
+                });
+
+
+                setReplyTo(null);
+
+
+            }
+
+
+
         } catch (err) { console.error(err); }
+
+
+
         finally { setIsUploading(false); setUploadFileName(''); if (fileInputRef.current) fileInputRef.current.value = ''; }
+
+
+
     };
+
+
+
+
+
+
 
     const handleFilePreview = async (fileName, fileUrl) => {
+
+
+
         const ext = fileName.split('.').pop().toLowerCase();
+
+
+
         // Use /api/view instead of /api/download for inline viewing
+
+
+
         const viewUrl = fileUrl.replace('/api/download/', '/api/view/');
+
+
+
         setPreviewFile({ name: fileName, url: viewUrl, ext });
+
+
+
         setPreviewData(null);
 
+
+
+
+
+
+
         const isTable = ['csv', 'xlsx', 'xls'].includes(ext);
+
+
+
         const isCode = ['py', 'ipynb', 'r', 'json', 'txt', 'js', 'jsx', 'html', 'css'].includes(ext);
 
+
+
+
+
+
+
         if (isTable || isCode) {
+
+
+
             setIsPreviewLoading(true);
+
+
+
             try {
+
+
+
                 const res = await fetch(fileUrl);
+
+
+
                 if (ext === 'csv') {
+
+
+
                     const text = await res.text();
+
+
+
                     Papa.parse(text, {
+
+
+
                         complete: (results) => {
+
+
+
                             // Limit to 500 rows for performance
+
+
+
                             const data = results.data.slice(0, 500);
+
+
+
                             setPreviewData({ type: 'table', data });
+
+
+
                         },
+
+
+
                         header: false
+
+
+
                     });
+
+
+
                 } else if (ext === 'xlsx' || ext === 'xls') {
+
+
+
                     const buffer = await res.arrayBuffer();
+
+
+
                     const wb = XLSX.read(buffer, { type: 'array' });
+
+
+
                     const wsname = wb.SheetNames[0];
+
+
+
                     const ws = wb.Sheets[wsname];
+
+
+
                     const data = XLSX.utils.sheet_to_json(ws, { header: 1 }).slice(0, 500);
+
+
+
                     setPreviewData({ type: 'table', data });
+
+
+
                 } else if (isCode) {
+
+
+
                     const text = await res.text();
+
+
+
                     // Limit to 5,000 characters for performance
+
+
+
                     const truncated = text.length > 5000 ? text.substring(0, 5000) + '\n\n... (file truncated for preview)' : text;
+
+
+
                     setPreviewData({ type: 'code', data: truncated });
+
+
+
                 }
+
+
+
             } catch (err) {
+
+
+
                 console.error('Preview error:', err);
+
+
+
                 setPreviewData({ type: 'error', data: 'Failed to load preview' });
+
+
+
             } finally {
+
+
+
                 setIsPreviewLoading(false);
+
+
+
             }
+
+
+
         }
+
+
+
     };
+
+
+
+
+
+
 
     const handlePaste = (e) => {
+
+
+
         const items = e.clipboardData?.items;
+
+
+
         if (!items) return;
+
+
+
         for (let i = 0; i < items.length; i++) {
+
+
+
             if (items[i].type.indexOf('image/') !== -1) {
+
+
+
                 const blob = items[i].getAsFile();
+
+
+
                 if (blob) {
+
+
+
                     e.preventDefault();
+
+
+
                     const file = new File([blob], 'pasted-image.png', { type: blob.type });
+
+
+
                     handleFileUpload(file);
+
+
+
                     break;
+
+
+
                 }
+
+
+
             }
+
+
+
         }
+
+
+
     };
+
+
+
+
+
+
 
     const handleEdit = (msg) => {
+
+
+
         setEditingId(msg.id);
+
+
+
         setEditInput(msg.message);
+
+
+
     };
+
+
+
+
+
+
 
     const saveEdit = (messageId, timestamp) => {
+
+
+
         if (!editInput.trim() || editInput === messages.find(m => m.id === messageId)?.message) {
+
+
+
             setEditingId(null);
+
+
+
             return;
+
+
+
         }
+
+
+
         socketRef.current.emit('edit_message', { roomId, messageId, newMessage: editInput, timestamp });
+
+
+
         setEditingId(null);
+
+
+
         setEditInput('');
+
+
+
     };
+
+
+
+
+
+
 
     const handleCopy = (text, idx) => {
+
+
+
         navigator.clipboard.writeText(text);
+
+
+
         setCopiedId(idx);
+
+
+
         setTimeout(() => setCopiedId(null), 2000);
+
+
+
     };
 
+
+
+
+
+
+
     const typingLabel = (() => {
+
+
+
         if (!typingUsers.length) return null;
+
+
+
         if (typingUsers.length === 1) return `${typingUsers[0]} is typing`;
+
+
+
         if (typingUsers.length === 2) return `${typingUsers[0]} and ${typingUsers[1]} are typing`;
+
+
+
         return `${typingUsers[0]} and ${typingUsers.length - 1} others are typing`;
+
+
+
     })();
 
+
+
+
+
+
+
     // ── Shredded ─────────────────────────────────────────────────────
+
+
+
     if (isShredded) return (
+
+
+
         <div className="flex h-[100dvh] items-center justify-center p-6 text-center bg-[var(--bg-main)]">
+
+
+
             <div className="space-y-6 fade-in max-w-sm w-full p-8 rounded-2xl glass-panel">
+
+
+
                 <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center bg-[var(--bg-surface)] border border-[var(--border-color)]">
+
+
+
                     <Shield className="w-8 h-8 text-[var(--danger)]" />
+
+
+
                 </div>
+
+
+
                 <div>
+
+
+
                     <h1 className="text-2xl font-bold text-white mb-2">Room Shredded</h1>
+
+
+
                     <p className="text-sm text-[var(--text-secondary)]">The 45-minute secure session has ended. All ephemeral data has been securely destroyed.</p>
+
+
+
                 </div>
+
+
+
                 <button onClick={onLeave} className="btn-primary w-full py-3 rounded-xl font-medium">Return to Home</button>
+
+
+
             </div>
+
+
+
         </div>
+
+
+
     );
 
+
+
+
+
+
+
     // ── Main Layout ──────────────────────────────────────────────────
+
+
+
     return (
+
+
+
         <div className="flex flex-col lg:flex-row h-[100dvh] overflow-hidden bg-[var(--bg-main)]">
 
+
+
+
+
+
+
             {/* LEAVE MODAL */}
+
+
+
             {showLeaveConfirm && (
+
+
+
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+
+
+
                     onClick={() => setShowLeaveConfirm(false)}>
+
+
+
                     <div className="w-full max-w-sm bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl p-6 fade-in shadow-2xl"
+
+
+
                         onClick={e => e.stopPropagation()}>
+
+
+
                         <div className="flex items-center gap-4 mb-4">
+
+
+
                             <div className="p-3 bg-red-500/10 rounded-xl">
+
+
+
                                 <AlertTriangle className="w-6 h-6 text-[var(--danger)]" />
+
+
+
                             </div>
+
+
+
                             <div>
+
+
+
                                 <h3 className="text-lg font-semibold text-white">Leave Room?</h3>
+
+
+
                                 <p className="text-sm text-[var(--text-secondary)]">You will lose access to this session.</p>
+
+
+
                             </div>
+
+
+
                         </div>
+
+
+
                         <div className="flex gap-3 mt-6">
+
+
+
                             <button onClick={() => setShowLeaveConfirm(false)} className="flex-1 btn-secondary py-2.5 rounded-xl font-medium">Cancel</button>
+
+
+
                             <button onClick={onLeave} className="flex-1 bg-[var(--danger)] hover:bg-red-600 text-white py-2.5 rounded-xl font-medium transition-colors">Leave</button>
+
+
+
                         </div>
+
+
+
                     </div>
+
+
+
                 </div>
+
+
+
             )}
+
+
+
+
+
+
 
             {/* SIDEBAR */}
+
+
+
             {showMembers && (
+
+
+
                 <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setShowMembers(false)} />
+
+
+
             )}
 
+
+
+
+
+
+
             <aside className={`fixed inset-y-0 left-0 w-72 z-50 flex flex-col transform transition-transform duration-200 bg-[var(--bg-surface)] border-r border-[var(--border-color)]
+
+
+
                 ${showMembers ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0`}>
 
+
+
+
+
+
+
                 {/* Brand / Room Info */}
+
+
+
                 <div className="p-5 border-b border-[var(--border-color)]">
+
+
+
                     <div className="flex items-center justify-between mb-4">
+
+
+
                         <div className="flex items-center gap-3">
+
+
+
                             <div className="w-8 h-8 rounded-lg bg-[var(--primary-accent)]/10 flex items-center justify-center">
+
+
+
                                 <Hash className="w-4 h-4 text-[var(--primary-accent)]" />
+
+
+
                             </div>
+
+
+
                             <div>
+
+
+
                                 <h2 className="text-sm font-semibold text-white">{roomId}</h2>
+
+
+
                                 <p className="text-xs text-[var(--text-secondary)]">Ephemeral Room</p>
+
+
+
                             </div>
+
+
+
                         </div>
+
+
+
                         <button onClick={() => setShowMembers(false)} className="lg:hidden p-1.5 rounded-md hover:bg-[var(--bg-surface-hover)] text-[var(--text-secondary)]">
+
+
+
                             <X className="w-4 h-4" />
+
+
+
                         </button>
+
+
+
                     </div>
+
+
+
+
+
+
 
                     <div className="flex items-center gap-2 p-2.5 rounded-lg bg-[var(--bg-main)] border border-[var(--border-color)]">
+
+
+
                         <Lock className="w-4 h-4 text-[var(--success)]" />
+
+
+
                         <span className="text-xs font-medium text-[var(--text-secondary)]">End-to-End Encrypted</span>
+
+
+
                     </div>
+
+
+
                 </div>
+
+
+
+
+
+
 
                 {/* Members List */}
+
+
+
                 <div className="flex-1 overflow-y-auto p-3">
+
+
+
                     <div className="px-2 mb-2">
+
+
+
                         <p className="text-xs font-semibold text-[var(--text-secondary)] uppercase tracking-wider">Members — {userCount}</p>
+
+
+
                     </div>
+
+
+
                     <div className="space-y-1">
+
+
+
                         {members.map(member => {
+
+
+
                             const isMe = member.name === username;
+
+
+
                             const uc = getUserColor(member.name);
+
+
+
                             return (
+
+
+
                                 <div key={member.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors ${isMe ? 'bg-[var(--bg-main)]' : 'hover:bg-[var(--bg-surface-hover)]'}`}>
+
+
+
                                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm" style={{ backgroundColor: uc }}>
+
+
+
                                         {member.name[0].toUpperCase()}
+
+
+
                                     </div>
+
+
+
                                     <div className="flex-1 min-w-0">
+
+
+
                                         <p className="text-sm font-medium text-white truncate">{member.name}</p>
+
+
+
                                         <p className="text-xs text-[var(--text-secondary)]">{isMe ? 'You' : 'Active'}</p>
+
+
+
                                     </div>
+
+
+
                                 </div>
+
+
+
                             );
+
+
+
                         })}
+
+
+
                     </div>
+
+
+
                 </div>
+
+
+
+
+
+
 
                 {/* Timer Info */}
+
+
+
                 <div className="p-5 border-t border-[var(--border-color)]">
+
+
+
                     <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--bg-main)] border border-[var(--border-color)]">
+
+
+
                         <div className="p-2 rounded-lg bg-[var(--primary-accent)]/10">
+
+
+
                             <Clock className="w-4 h-4 text-[var(--primary-accent)]" />
+
+
+
                         </div>
+
+
+
                         <div>
+
+
+
                             <p className="text-xs text-[var(--text-secondary)]">Time Remaining</p>
+
+
+
                             <p className="text-lg font-mono font-semibold text-white tracking-widest leading-none mt-0.5">{timeLeft}</p>
+
+
+
                         </div>
+
+
+
                     </div>
+
+
+
                 </div>
+
+
+
             </aside>
 
+
+
+
+
+
+
             {/* MAIN CHAT */}
+
+
+
             <main className="flex-1 flex flex-col min-w-0 h-full bg-[var(--bg-main)]">
 
+
+
+
+
+
+
                 {/* Header */}
+
+
+
                 <header className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-color)] bg-[var(--bg-main)]/80 backdrop-blur-md sticky top-0 z-20">
+
+
+
                     <div className="flex items-center gap-4">
+
+
+
                         <button onClick={() => setShowMembers(true)} className="lg:hidden p-2 rounded-lg btn-secondary text-[var(--text-secondary)]">
+
+
+
                             <Users className="w-5 h-5" />
+
+
+
                         </button>
+
+
+
                         <div>
+
+
+
                             <h1 className="text-lg font-semibold text-white">Secure Chat</h1>
+
+
+
                             <div className="flex items-center gap-2 mt-0.5">
+
+
+
                                 <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-[var(--success)]' : 'bg-[var(--danger)]'}`} />
+
+
+
                                 <span className="text-xs font-medium text-[var(--text-secondary)]">{isConnected ? 'Connected' : 'Offline'}</span>
+
+
+
                             </div>
+
+
+
                         </div>
+
+
+
                     </div>
 
+
+
+
+
+
+
                     <button onClick={() => setShowLeaveConfirm(true)} className="btn-secondary px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 hover:text-[var(--danger)] hover:border-[var(--danger)]/30">
+
+
+
                         <LogOut className="w-4 h-4" />
+
+
+
                         <span className="hidden sm:inline">Leave</span>
+
+
+
                     </button>
+
+
+
                 </header>
 
+
+
+
+
+
+
                 {/* Messages Area */}
+
+
+
                 <div className="flex-1 overflow-y-auto p-5 space-y-6">
+
+
+
                     {messages.filter(m => m.type !== 'system').length === 0 && (
+
+
+
                         <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
+
+
+
                             <div className="p-4 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)]">
+
+
+
                                 <Shield className="w-8 h-8 text-[var(--primary-accent)]" />
+
+
+
                             </div>
+
+
+
                             <div>
+
+
+
                                 <h3 className="text-lg font-medium text-white">No messages yet</h3>
+
+
+
                                 <p className="text-sm text-[var(--text-secondary)] mt-1">Start a secure, untraceable conversation.</p>
+
+
+
                             </div>
+
+
+
                         </div>
+
+
+
                     )}
+
+
+
+
+
+
 
                     {messages.map((msg, i) => {
                         const isMe = msg.username === username;
@@ -433,32 +1785,65 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                                     {!isMe && <span className="text-xs font-medium ml-1" style={{ color: uc }}>{msg.username}</span>}
 
                                     <div className={`px-4 py-3 rounded-2xl relative group/bubble ${isMe ? 'bg-[var(--primary-accent)] text-white' : 'bg-[var(--bg-surface)] border border-[var(--border-color)] text-[var(--text-primary)]'}`}
-                                        style={{ borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px' }}>
-
-                                        {/* Action Menu (Hover on Desktop, Always visible on mobile) */}
-                                        <div className={`absolute -top-3 ${isMe ? 'right-0' : 'left-0'} flex items-center gap-1 p-0.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-color)] shadow-xl opacity-0 group-hover/bubble:opacity-100 md:group-hover/bubble:opacity-100 transition-all z-30 scale-90 group-hover/bubble:scale-100 max-md:opacity-100 max-md:scale-100 max-md:static max-md:mt-2 max-md:bg-transparent max-md:border-none max-md:shadow-none`}>
-                                            <div className="flex items-center gap-1 max-md:bg-black/10 max-md:p-1 max-md:rounded-lg">
-                                                {msg.type === 'file' && (
-                                                    <>
-                                                        <button onClick={(e) => { e.stopPropagation(); handleFilePreview(msg.fileName, msg.fileUrl); }} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Preview">
-                                                            <Eye className="w-3.5 h-3.5" />
-                                                        </button>
-                                                        <a href={msg.fileUrl} download={msg.fileName} onClick={e => e.stopPropagation()} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Download">
-                                                            <Download className="w-3.5 h-3.5" />
-                                                        </a>
-                                                    </>
-                                                )}
-                                                <button onClick={(e) => { e.stopPropagation(); handleCopy(msg.message || msg.fileName, i); }} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Copy">
-                                                    {copiedId === i ? <Check className="w-3.5 h-3.5 text-[var(--success)]" /> : <Copy className="w-3.5 h-3.5" />}
-                                                </button>
-                                                {isMe && msg.type === 'text' && (new Date() - new Date(msg.timestamp)) < 300000 && !editingId && (
-                                                    <button onClick={(e) => { e.stopPropagation(); handleEdit(msg); }} className="p-1.5 hover:bg-white/10 rounded-md text-[var(--text-secondary)] hover:text-white transition-colors" title="Edit">
-                                                        <Pencil className="w-3.5 h-3.5" />
+                                        style={{ borderBottomRightRadius: isMe ? '4px' : '16px', borderBottomLeftRadius: isMe ? '16px' : '4px' }}
+                                        id={`msg-${msg.id}`}
+                                        onTouchStart={(e) => {
+                                            const touch = e.touches[0];
+                                            const startX = touch.clientX;
+                                            e.currentTarget.setAttribute('data-swipe-start', startX);
+                                        }}
+                                        onTouchEnd={(e) => {
+                                            const startX = parseFloat(e.currentTarget.getAttribute('data-swipe-start'));
+                                            const endX = e.changedTouches[0].clientX;
+                                            if (endX - startX > 80) { // Swipe right
+                                                setReplyTo(msg);
+                                            }
+                                        }}
+                                    >
+                                        {/* WhatsApp Style Dropdown Menu */}
+                                        <div className="absolute top-1 right-1 z-40 message-actions-container">
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === msg.id ? null : msg.id); }}
+                                                className={`p-1 rounded-full hover:bg-black/10 transition-colors ${activeMenuId === msg.id ? 'opacity-100' : 'opacity-0 group-hover/bubble:opacity-100 max-md:opacity-70'}`}
+                                            >
+                                                <ChevronDown className="w-4 h-4" />
+                                            </button>
+                                            
+                                            {activeMenuId === msg.id && (
+                                                <div className={`absolute top-full ${isMe ? 'right-0' : 'left-0'} mt-1 w-32 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl shadow-2xl py-1 z-50 animate-in fade-in zoom-in duration-200`}>
+                                                    <button onClick={(e) => { e.stopPropagation(); setReplyTo(msg); setActiveMenuId(null); }} className="w-full px-3 py-2 text-left text-xs hover:bg-white/5 flex items-center gap-2">
+                                                        <CornerUpLeft className="w-3.5 h-3.5" /> Reply
                                                     </button>
-                                                )}
-                                            </div>
+                                                    <button onClick={(e) => { e.stopPropagation(); handleCopy(msg.message || msg.fileName, i); setActiveMenuId(null); }} className="w-full px-3 py-2 text-left text-xs hover:bg-white/5 flex items-center gap-2">
+                                                        {copiedId === i ? <Check className="w-3.5 h-3.5 text-[var(--success)]" /> : <Copy className="w-3.5 h-3.5" />} Copy
+                                                    </button>
+                                                    {isMe && msg.type === 'text' && (new Date() - new Date(msg.timestamp)) < 300000 && !editingId && (
+                                                        <button onClick={(e) => { e.stopPropagation(); handleEdit(msg); setActiveMenuId(null); }} className="w-full px-3 py-2 text-left text-xs hover:bg-white/5 flex items-center gap-2">
+                                                            <Pencil className="w-3.5 h-3.5" /> Edit
+                                                        </button>
+                                                    )}
+                                                    {msg.type === 'file' && (
+                                                        <>
+                                                            <button onClick={(e) => { e.stopPropagation(); handleFilePreview(msg.fileName, msg.fileUrl); setActiveMenuId(null); }} className="w-full px-3 py-2 text-left text-xs hover:bg-white/5 flex items-center gap-2">
+                                                                <Eye className="w-3.5 h-3.5" /> Preview
+                                                            </button>
+                                                            <a href={msg.fileUrl} download={msg.fileName} onClick={e => { e.stopPropagation(); setActiveMenuId(null); }} className="w-full px-3 py-2 text-left text-xs hover:bg-white/5 flex items-center gap-2">
+                                                                <Download className="w-3.5 h-3.5" /> Download
+                                                            </a>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
 
+                                        {/* Reply Context */}
+                                        {msg.replyTo && (
+                                            <div className="mb-2 p-2 rounded-lg bg-black/10 border-l-2 border-[var(--primary-accent)] text-[10px] cursor-pointer" 
+                                                onClick={() => document.getElementById(`msg-${msg.replyTo.origId}`)?.scrollIntoView({ behavior: 'smooth' })}>
+                                                <p className={`font-bold ${isMe ? "text-white/90" : "text-[var(--primary-accent)]"}`}>{msg.replyTo.origUser}</p>
+                                                <p className="opacity-70 truncate">{msg.replyTo.origText}</p>
+                                            </div>
+                                        )}
 
                                         {msg.type === 'file' ? (
                                             <div onClick={() => handleFilePreview(msg.fileName, msg.fileUrl)} className="flex items-center gap-3 max-w-full overflow-hidden cursor-pointer select-none">
@@ -473,12 +1858,12 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                                         ) : (
                                             <div className="relative">
                                                 {editingId === msg.id ? (
-                                                    <div className="flex flex-col gap-2 min-w-[200px]">
+                                                    <div className="flex flex-col gap-2 min-w-[240px] w-full max-w-[500px]">
                                                         <textarea 
                                                             value={editInput}
                                                             onChange={e => setEditInput(e.target.value)}
-                                                            className="w-full bg-black/20 border border-white/20 rounded-lg p-2 text-sm text-white focus:outline-none resize-none"
-                                                            rows={2}
+                                                            className="w-full bg-black/40 border border-white/20 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-white/30 resize-none shadow-inner"
+                                                            rows={4}
                                                             autoFocus
                                                         />
                                                         <div className="flex justify-end gap-2">
@@ -520,175 +1905,698 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
                         );
                     })}
                     <div ref={scrollRef} />
+
+
+
                 </div>
+
+
+
+
+
+
 
                 {/* Input Area */}
-                <div className="px-4 pb-4 pt-0 bg-gradient-to-t from-[var(--bg-main)] to-transparent shrink-0">
-                    <div className="max-w-4xl mx-auto relative">
-                        {/* Compact Status Chips */}
-                        <div className="absolute -top-10 left-0 right-0 flex items-center gap-2 pointer-events-none">
-                            {typingLabel && (
-                                <div className="text-[10px] font-bold text-[var(--text-secondary)] bg-[var(--bg-surface)]/80 backdrop-blur-md border border-[var(--border-color)] px-2.5 py-1 rounded-full animate-pulse uppercase tracking-wider">
-                                    {typingLabel}
-                                </div>
-                            )}
-                            {isUploading && (
-                                <div className="flex items-center gap-2 text-[10px] font-bold text-[var(--primary-accent)] bg-[var(--primary-accent)]/10 backdrop-blur-md border border-[var(--primary-accent)]/20 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                                    <span className="w-2 h-2 rounded-full border border-t-transparent animate-spin border-[var(--primary-accent)]" /> Uploading
-                                </div>
-                            )}
-                            {!isConnected && (
-                                <div className="flex items-center gap-2 text-[10px] font-bold text-[var(--danger)] bg-[var(--danger)]/10 backdrop-blur-md border border-[var(--danger)]/20 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                                    <WifiOff className="w-2.5 h-2.5" /> Offline
-                                </div>
-                            )}
-                        </div>
 
-                        <form onSubmit={sendMessage} className="flex items-center gap-1 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl px-1 py-0.5 focus-within:border-[var(--primary-accent)] transition-all shadow-lg">
+
+
+                <div className="px-4 pb-4 pt-0 bg-gradient-to-t from-[var(--bg-main)] to-transparent shrink-0">
+
+
+
+                    <div className="max-w-4xl mx-auto relative">
+
+
+
+
+
+
+
+
+
+
+                         {/* Reply Preview */}
+
+
+
+                         {replyTo && (
+
+
+
+                             <div className="mb-2 p-3 bg-[var(--bg-surface)] border-l-4 border-l-[var(--primary-accent)] border border-[var(--border-color)] rounded-xl flex items-center justify-between fade-in shadow-lg">
+
+
+
+                                 <div className="flex flex-col min-w-0 pr-4">
+
+
+
+                                     <p className="text-[10px] font-bold text-[var(--primary-accent)] uppercase tracking-wider">{replyTo.username}</p>
+
+
+
+                                     <p className="text-xs text-[var(--text-secondary)] truncate">{replyTo.message || (replyTo.type === 'file' ? replyTo.fileName : 'File')}</p>
+
+
+
+                                 </div>
+
+
+
+                                 <button onClick={() => setReplyTo(null)} className="p-1.5 hover:bg-white/10 rounded-lg text-[var(--text-secondary)] hover:text-white transition-all shrink-0">
+
+
+
+                                     <X className="w-4 h-4" />
+
+
+
+                                 </button>
+
+
+
+                             </div>
+
+
+
+                         )}
+
+
+
+
+
+
+
+                        <form onSubmit={sendMessage} className="flex items-center gap-2 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl px-2 py-1 focus-within:border-[var(--primary-accent)] transition-all shadow-lg">
+
+
+
                             <input
+
+
+
                                 type="file"
+
+
+
                                 hidden
+
+
+
                                 ref={fileInputRef}
+
+
+
                                 onChange={handleFileUpload}
-                                accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.docx,.doc,.txt,.py,.ipynb,.csv,.r,.json,.xlsx,.xls,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+
+                                accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.docx,.doc,.txt,.py,.ipynb,.csv,.r,.json,.xlsx,.xls,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+
+
                             />
+
+
+
                             <button
+
+
+
                                 type="button"
+
+
+
                                 onClick={() => fileInputRef.current.click()}
+
+
+
                                 disabled={!isConnected || isShredded}
+
+
+
                                 className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-white hover:bg-white/10 transition-all shrink-0"
+
+
+
                                 title="Attach"
+
+
+
                             >
+
+
+
                                 <Paperclip className="w-4 h-4" />
+
+
+
                             </button>
+
+
+
                             
+
+
+
                             <textarea
+
+
+
                                 value={input}
+
+
+
                                 onChange={handleInputChange}
+
+
+
                                 onPaste={handlePaste}
+
+
+
                                 disabled={!isConnected || isShredded}
+
+
+
                                 placeholder={isShredded ? "Session ended" : "Whisper something..."}
-                                className="flex-1 max-h-32 min-h-[30px] bg-transparent border-none text-[13px] text-white resize-none outline-none py-1.5 px-1 leading-normal"
+
+
+
+                                className="flex-1 max-h-32 bg-transparent border-none text-[14px] text-white resize-none outline-none m-0 p-0 pt-[4px] pb-0 px-1 leading-6"
+
+
+
                                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(e); } }}
+
+
+
                             />
+
+
+
+
+
+
 
                             <button type="submit" disabled={!isConnected || isShredded || !input.trim()}
+
+
+
                                 className="p-1.5 rounded-lg bg-[var(--primary-accent)] text-white hover:scale-105 active:scale-95 disabled:opacity-30 disabled:grayscale transition-all shrink-0">
+
+
+
                                 <Send className="w-4 h-4" />
+
+
+
                             </button>
+
+
+
                         </form>
+
+                        {/* Status chips below input */}
+                        {(typingLabel || isUploading || !isConnected) && (
+                            <div className="flex items-center justify-center gap-2 mt-1.5 pointer-events-none">
+                                {typingLabel && (
+                                    <div className="text-[10px] font-bold text-[var(--text-secondary)] bg-[var(--bg-surface)]/80 backdrop-blur-md border border-[var(--border-color)] px-2.5 py-1 rounded-full animate-pulse uppercase tracking-wider">
+                                        {typingLabel}
+                                    </div>
+                                )}
+                                {isUploading && (
+                                    <div className="flex items-center gap-2 text-[10px] font-bold text-[var(--primary-accent)] bg-[var(--primary-accent)]/10 backdrop-blur-md border border-[var(--primary-accent)]/20 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                                        <span className="w-2 h-2 rounded-full border border-t-transparent animate-spin border-[var(--primary-accent)]" /> Uploading
+                                    </div>
+                                )}
+                                {!isConnected && (
+                                    <div className="flex items-center gap-2 text-[10px] font-bold text-[var(--danger)] bg-[var(--danger)]/10 backdrop-blur-md border border-[var(--danger)]/20 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                                        <WifiOff className="w-2.5 h-2.5" /> Offline
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+
+
                     </div>
+
+
+
                 </div>
+
+
+
+
+
+
 
             </main>
 
+
+
+
+
+
+
             {/* PREVIEW MODAL */}
+
+
+
             {previewFile && (
+
+
+
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+
+
+
                     onClick={() => setPreviewFile(null)}>
+
+
+
                     <div className="w-full max-w-5xl max-h-[90vh] bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-2xl flex flex-col overflow-hidden fade-in shadow-2xl"
+
+
+
                         onClick={e => e.stopPropagation()}>
+
+
+
                         
+
+
+
                         {/* Modal Header */}
+
+
+
                         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border-color)] bg-[var(--bg-surface)]">
+
+
+
                             <div className="flex items-center gap-3 min-w-0">
+
+
+
                                 <div className="p-2 rounded-lg bg-[var(--primary-accent)]/10 text-[var(--primary-accent)] shrink-0">
+
+
+
                                     <Paperclip className="w-5 h-5" />
+
+
+
                                 </div>
+
+
+
                                 <div className="min-w-0">
+
+
+
                                     <h3 className="text-sm font-semibold text-white truncate">{previewFile.name}</h3>
+
+
+
                                     <p className="text-xs text-[var(--text-secondary)]">{getFileLabel(previewFile.name)}</p>
+
+
+
                                 </div>
+
+
+
                             </div>
+
+
+
                             <div className="flex items-center gap-3">
+
+
+
                                 <a href={previewFile.url} download={previewFile.name} className="btn-secondary px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs font-medium">
+
+
+
                                     <Download className="w-4 h-4" /> <span className="hidden sm:inline">Download</span>
+
+
+
                                 </a>
+
+
+
                                 <button 
+
+
+
                                     onClick={(e) => { e.stopPropagation(); setPreviewFile(null); }} 
+
+
+
                                     className="p-2 rounded-lg hover:bg-white/10 text-[var(--text-secondary)] hover:text-white transition-all active:scale-95"
+
+
+
                                     aria-label="Close preview"
+
+
+
                                 >
+
+
+
                                     <X className="w-5 h-5" />
+
+
+
                                 </button>
+
+
+
                             </div>
+
+
+
                         </div>
+
+
+
+
+
+
 
                         {/* Modal Body */}
+
+
+
                         <div className="flex-1 overflow-auto p-4 bg-[var(--bg-main)]">
+
+
+
                             {isPreviewLoading ? (
+
+
+
                                 <div className="h-full flex items-center justify-center">
+
+
+
                                     <div className="w-10 h-10 border-4 border-[var(--primary-accent)] border-t-transparent rounded-full animate-spin" />
+
+
+
                                 </div>
+
+
+
                             ) : (
+
+
+
                                 <div className="h-full">
+
+
+
                                     {/* Image Preview */}
+
+
+
                                     {['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(previewFile.ext) && (
+
+
+
                                         <div className="h-full flex items-center justify-center">
+
+
+
                                             <img src={previewFile.url} alt={previewFile.name} className="max-w-full max-h-full object-contain rounded-lg" />
+
+
+
                                         </div>
+
+
+
                                     )}
+
+
+
+
+
+
 
                                     {/* PDF Preview */}
+
+
+
                                     {previewFile.ext === 'pdf' && (
+
+
+
                                         <div className="w-full h-[80vh] rounded-lg bg-white overflow-hidden shadow-inner">
+
+
+
                                             <iframe src={previewFile.url} className="w-full h-full border-none" title="PDF Preview" />
+
+
+
                                         </div>
+
+
+
                                     )}
+
+
+
+
+
+
 
                                     {/* Table Preview (CSV/XLSX) */}
+
+
+
                                     {previewData?.type === 'table' && (
+
+
+
                                         <div className="overflow-auto border border-[var(--border-color)] rounded-lg">
+
+
+
                                             <table className="w-full border-collapse text-sm text-left">
+
+
+
                                                 <tbody className="divide-y divide-[var(--border-color)]">
+
+
+
                                                     {previewData.data.map((row, i) => (
+
+
+
                                                         <tr key={i} className={i === 0 ? "bg-[var(--bg-surface)] font-semibold text-white sticky top-0" : "hover:bg-[var(--bg-surface)] text-[var(--text-secondary)]"}>
+
+
+
                                                             {row.map((cell, j) => (
+
+
+
                                                                 <td key={j} className="px-4 py-3 border-r border-[var(--border-color)] whitespace-nowrap">{cell}</td>
+
+
+
                                                             ))}
+
+
+
                                                         </tr>
+
+
+
                                                     ))}
+
+
+
                                                 </tbody>
+
+
+
                                             </table>
+
+
+
                                         </div>
+
+
+
                                     )}
+
+
+
+
+
+
 
                                     {/* Code Preview */}
+
+
+
                                     {previewData?.type === 'code' && (
+
+
+
                                         <div className="h-full bg-[var(--bg-surface)] rounded-lg border border-[var(--border-color)] overflow-hidden flex flex-col">
+
+
+
                                             <div className="px-4 py-2 bg-black/20 border-b border-[var(--border-color)] flex items-center justify-between">
+
+
+
                                                 <span className="text-[10px] font-mono text-[var(--text-secondary)] uppercase tracking-widest">{previewFile.ext} Viewer</span>
+
+
+
                                                 <button onClick={() => handleCopy(previewData.data, -1)} className="p-1 hover:bg-white/10 rounded transition-colors text-[var(--text-secondary)]">
+
+
+
                                                     {copiedId === -1 ? <Check className="w-3 h-3 text-[var(--success)]" /> : <Copy className="w-3 h-3" />}
+
+
+
                                                 </button>
+
+
+
                                             </div>
+
+
+
                                             <pre className="flex-1 p-6 overflow-auto font-mono text-sm text-[var(--text-primary)] leading-relaxed whitespace-pre select-text">
+
+
+
                                                 {previewData.data}
+
+
+
                                             </pre>
+
+
+
                                         </div>
+
+
+
                                     )}
+
+
+
+
+
+
 
                                     {/* Unsupported/Fallback */}
+
+
+
                                     {!['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf'].includes(previewFile.ext) && !previewData && (
+
+
+
                                         <div className="h-full flex flex-col items-center justify-center text-center space-y-4">
+
+
+
                                             <div className="p-4 rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-color)]">
+
+
+
                                                 <Paperclip className="w-8 h-8 text-[var(--text-secondary)]" />
+
+
+
                                             </div>
+
+
+
                                             <div>
+
+
+
                                                 <h3 className="text-lg font-medium text-white">Preview unavailable</h3>
+
+
+
                                                 <p className="text-sm text-[var(--text-secondary)] mt-1">Downloading might be required for this file type.</p>
+
+
+
                                                 <a href={previewFile.url} download={previewFile.name} className="btn-primary mt-6 inline-flex px-6 py-2.5 rounded-xl">Download File</a>
+
+
+
                                             </div>
+
+
+
                                         </div>
+
+
+
                                     )}
+
+
+
                                 </div>
+
+
+
                             )}
+
+
+
                         </div>
+
+
+
                     </div>
+
+
+
                 </div>
+
+
+
             )}
+
+
+
         </div>
+
+
+
     );
+
+
+
 };
 
+
+
+
+
+
+
 export default ChatRoom;
+
+
+

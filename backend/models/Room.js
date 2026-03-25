@@ -14,12 +14,12 @@ const roomSchema = new mongoose.Schema({
     },
     createdAt: {
         type: Date,
-        default: Date.now,
-        index: { expires: 2700 } // TTL index for 45 minutes (2700 seconds)
+        default: Date.now
     },
     lastActive: {
         type: Date,
-        default: Date.now
+        default: Date.now,
+        index: { expires: 3600 } // TTL index for 1 hour (3600 seconds)
     }
 });
 

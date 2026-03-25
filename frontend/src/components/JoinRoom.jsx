@@ -169,7 +169,7 @@ const JoinRoom = ({ onJoin }) => {
             <div className="flex items-center gap-6 mt-8 fade-in" style={{ animationDelay: '0.2s', color: '#848d97' }}>
                 <div className="flex items-center gap-2 text-xs font-medium">
                     <Zap className="w-3.5 h-3.5" style={{ color: '#2f81f7' }} />
-                    Auto-shreds in 45m
+                    Auto-shreds in 2h
                 </div>
                 <div className="flex items-center gap-2 text-xs font-medium">
                     <Shield className="w-3.5 h-3.5" style={{ color: '#3fb950' }} />
