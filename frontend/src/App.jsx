@@ -4,14 +4,37 @@ import ChatRoom from './components/ChatRoom';
 
 function App() {
   const [roomData, setRoomData] = useState(() => {
-    const saved = localStorage.getItem('whisperlink_session');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('whisperlink_session');
+      if (!saved) return null;
+      
+      const session = JSON.parse(saved);
+      const createdAt = session.createdAt;
+      
+      // If session is older than 2 hours (120 minutes), clear it
+      if (createdAt && Date.now() > new Date(createdAt).getTime() + 120 * 60 * 1000) {
+        localStorage.removeItem('whisperlink_session');
+        localStorage.removeItem(`wl_messages_${session.roomId}`);
+        localStorage.removeItem(`wl_expiry_${session.roomId}`);
+        return null;
+      }
+      
+      return session;
+    } catch {
+      return null;
+    }
   });
 
-  // Controls whether we show the chat room or the join screen.
-  // We keep roomData in localStorage so messages in sessionStorage can be
-  // restored when the user rejoins. Only a true "leave" clears everything.
-  const [viewChat, setViewChat] = useState(!!localStorage.getItem('whisperlink_session'));
+  const [viewChat, setViewChat] = useState(() => {
+    const saved = localStorage.getItem('whisperlink_session');
+    if (!saved) return false;
+    try {
+      const session = JSON.parse(saved);
+      return (Date.now() <= new Date(session.createdAt).getTime() + 120 * 60 * 1000);
+    } catch {
+      return false;
+    }
+  });
 
   // Intercept browser back button: show join screen but keep session saved
   // so messages survive when the user goes back and then rejoins the same room.

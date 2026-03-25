@@ -342,59 +342,7 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
 
 
 
-    useEffect(() => {
 
-
-
-        if (!createdAt) return;
-
-
-
-        const shredTime = new Date(createdAt).getTime() + 120 * 60 * 1000;
-
-
-
-        const updateTimer = () => {
-
-
-
-            const diff = shredTime - Date.now();
-
-
-
-            if (diff <= 0) { setTimeLeft('00:00'); setIsShredded(true); localStorage.removeItem(MSG_KEY(roomId)); localStorage.removeItem(MSG_EXPIRY_KEY(roomId)); clearInterval(iv); return; }
-
-
-
-            const m = Math.floor((diff % (3600000)) / 60000);
-
-
-
-            const s = Math.floor((diff % 60000) / 1000);
-
-
-
-            setTimeLeft(`${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
-
-
-
-        };
-
-
-
-        updateTimer();
-
-
-
-        const iv = setInterval(updateTimer, 1000);
-
-
-
-        return () => clearInterval(iv);
-
-
-
-    }, [createdAt, roomId]);
 
 
 
@@ -1149,68 +1097,45 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
 
 
 
-        return `${typingUsers[0]} and ${typingUsers.length - 1} others are typing`;
-
-
-
     })();
 
+    useEffect(() => {
 
-
-
-
-
+        if (!createdAt) return;
+        const shredTime = new Date(createdAt).getTime() + 120 * 60 * 1000;
+        const updateTimer = () => {
+            const diff = shredTime - Date.now();
+            if (diff <= 0) {
+                setTimeLeft('00:00');
+                setIsShredded(true);
+                localStorage.removeItem(MSG_KEY(roomId));
+                localStorage.removeItem(MSG_EXPIRY_KEY(roomId));
+                localStorage.removeItem('whisperlink_session');
+                clearInterval(iv);
+                return;
+            }
+            const m = Math.floor((diff % 3600000) / 60000);
+            const s = Math.floor((diff % 60000) / 1000);
+            setTimeLeft(`${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
+        };
+        updateTimer();
+        const iv = setInterval(updateTimer, 1000);
+        return () => clearInterval(iv);
+    }, [createdAt, roomId]);
 
     // ── Shredded ─────────────────────────────────────────────────────
-
-
-
     if (isShredded) return (
-
-
-
-        <div className="flex h-[100dvh] items-center justify-center p-6 text-center bg-[var(--bg-main)]">
-
-
-
-            <div className="space-y-6 fade-in max-w-sm w-full p-8 rounded-2xl glass-panel">
-
-
-
-                <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center bg-[var(--bg-surface)] border border-[var(--border-color)]">
-
-
-
+        <div className="flex h-[100dvh] items-center justify-center p-6 text-center bg-gradient-to-b from-[#0e1116] to-[#161a22]">
+            <div className="space-y-6 animate-in fade-in zoom-in duration-500 max-w-sm w-full p-8 rounded-2xl glass-panel shadow-2xl">
+                <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center bg-red-500/10 border border-red-500/20 animate-pulse">
                     <Shield className="w-8 h-8 text-[var(--danger)]" />
-
-
-
                 </div>
-
-
-
                 <div>
-
-
-
                     <h1 className="text-2xl font-bold text-white mb-2">Room Shredded</h1>
-
-
-
-                    <p className="text-sm text-[var(--text-secondary)]">The 45-minute secure session has ended. All ephemeral data has been securely destroyed.</p>
-
-
-
+                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed">The 2-hour secure session has ended. All ephemeral data has been securely destroyed.</p>
                 </div>
-
-
-
-                <button onClick={onLeave} className="btn-primary w-full py-3 rounded-xl font-medium">Return to Home</button>
-
-
-
+                <button onClick={onLeave} className="btn-primary w-full py-3 rounded-xl font-medium shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all">Return to Home</button>
             </div>
-
 
 
         </div>
