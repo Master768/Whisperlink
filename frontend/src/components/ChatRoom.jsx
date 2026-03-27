@@ -1912,6 +1912,16 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
 
 
 
+
+                        {/* Typing Indicator above input, aligned left */}
+                        {typingLabel && (
+                            <div className="flex justify-start mb-2 ml-1 pointer-events-none fade-in">
+                                <div className="text-[10px] font-bold text-[var(--text-secondary)] bg-[var(--bg-surface)]/80 backdrop-blur-md border border-[var(--border-color)] px-2.5 py-1 rounded-full animate-pulse uppercase tracking-wider">
+                                    {typingLabel}
+                                </div>
+                            </div>
+                        )}
+
                         <form onSubmit={sendMessage} className="flex items-center gap-2 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-xl px-2 py-1 focus-within:border-[var(--primary-accent)] transition-all shadow-lg">
 
 
@@ -2042,14 +2052,9 @@ const ChatRoom = ({ roomId, secretPhrase, username, createdAt, onLeave }) => {
 
                         </form>
 
-                        {/* Status chips below input */}
-                        {(typingLabel || isUploading || !isConnected) && (
+                        {/* Status chips below input (Uploading, Offline) */}
+                        {(isUploading || !isConnected) && (
                             <div className="flex items-center justify-center gap-2 mt-1.5 pointer-events-none">
-                                {typingLabel && (
-                                    <div className="text-[10px] font-bold text-[var(--text-secondary)] bg-[var(--bg-surface)]/80 backdrop-blur-md border border-[var(--border-color)] px-2.5 py-1 rounded-full animate-pulse uppercase tracking-wider">
-                                        {typingLabel}
-                                    </div>
-                                )}
                                 {isUploading && (
                                     <div className="flex items-center gap-2 text-[10px] font-bold text-[var(--primary-accent)] bg-[var(--primary-accent)]/10 backdrop-blur-md border border-[var(--primary-accent)]/20 px-2.5 py-1 rounded-full uppercase tracking-wider">
                                         <span className="w-2 h-2 rounded-full border border-t-transparent animate-spin border-[var(--primary-accent)]" /> Uploading
